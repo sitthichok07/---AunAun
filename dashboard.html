@@ -653,7 +653,104 @@
       text-align: center;
       width: 100%;
     }
-  </style>
+  
+    /* ══ ONBOARDING TOUR ═════════════════════════ */
+    .tour-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: transparent;
+      z-index: 9998;
+      pointer-events: none;
+      display: none;
+    }
+    .tour-overlay.show {
+      pointer-events: auto;
+      display: block;
+    }
+    .tour-spotlight {
+      position: fixed;
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75), 0 0 15px rgba(240, 185, 11, 0.4);
+      z-index: 9999;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      display: none;
+    }
+    .tour-spotlight.show {
+      display: block;
+    }
+    .tour-card {
+      position: fixed;
+      z-index: 10000;
+      width: 320px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .tour-card.show {
+      display: flex;
+    }
+    .tour-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tour-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .tour-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .tour-progress {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .tour-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .tour-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      transition: all 0.2s;
+    }
+    .tour-btn:hover {
+      background: var(--bg-hover);
+    }
+    .tour-btn-primary {
+      background: var(--accent);
+      color: #0b0e11;
+      border: none;
+    }
+    .tour-btn-primary:hover {
+      background: var(--accent-hover);
+    }
+</style>
   <!-- Supabase JS Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -763,7 +860,7 @@
           <span id="active-account-label">เลือกบัญชี</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
         </div>
-        <button class="btn-icon" onclick="openAddTxModal()" title="เพิ่มรายการ">
+        <button id="btn-add-tx" class="btn-icon" onclick="openAddTxModal()" title="เพิ่มรายการ">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>
@@ -2192,22 +2289,17 @@ function setAdminFilter(f, el) {
   renderAdminPage();
 }
 
-function getAllUsers() {
-  // Admin itself + registered users from localStorage
-  const registered = JSON.parse(localStorage.getItem('gold_users') || '[]');
-  const bannedList  = JSON.parse(localStorage.getItem('gm_banned') || '[]');
-  // Build user list (admin is always first)
-  const adminUser = { name: 'Sitthichok', username: 'sitthichok', role: 'admin', banned: false, isAdmin: true };
-  const users = [adminUser, ...registered.map(u => ({
-    ...u,
-    role: 'user',
-    banned: bannedList.includes(u.username),
-    isAdmin: false
-  }))];
-  return users;
-}
-
-function banUser(username) {
+async function banUser(username) {
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_users').update({ banned: true }).eq('username', username);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
   const banned = JSON.parse(localStorage.getItem('gm_banned') || '[]');
   if (!banned.includes(username)) banned.push(username);
   localStorage.setItem('gm_banned', JSON.stringify(banned));
@@ -2215,7 +2307,17 @@ function banUser(username) {
   renderAdminPage();
 }
 
-function unbanUser(username) {
+async function unbanUser(username) {
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_users').update({ banned: false }).eq('username', username);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
   let banned = JSON.parse(localStorage.getItem('gm_banned') || '[]');
   banned = banned.filter(u => u !== username);
   localStorage.setItem('gm_banned', JSON.stringify(banned));
@@ -2223,49 +2325,112 @@ function unbanUser(username) {
   renderAdminPage();
 }
 
-function deleteUser(username) {
+async function deleteUser(username) {
   if (!confirm('ลบผู้ใช้ "' + username + '" ออกจากระบบ? ไม่สามารถกู้คืนได้')) return;
-  // Remove from user list
-  let users = JSON.parse(localStorage.getItem('gold_users') || '[]');
-  users = users.filter(u => u.username !== username);
-  localStorage.setItem('gold_users', JSON.stringify(users));
-  // Remove user-scoped data
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_users').delete().eq('username', username);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
+  let usersList = JSON.parse(localStorage.getItem('gold_users') || '[]');
+  usersList = usersList.filter(u => u.username !== username);
+  localStorage.setItem('gold_users', JSON.stringify(usersList));
+
   const k = userKeys(username);
   localStorage.removeItem(k.accs);
   localStorage.removeItem(k.txs);
   localStorage.removeItem('gm_fixed_exp_' + username);
-  // Remove from ban list too
+
   let banned = JSON.parse(localStorage.getItem('gm_banned') || '[]');
   banned = banned.filter(u => u !== username);
   localStorage.setItem('gm_banned', JSON.stringify(banned));
-  // If admin was viewing this user, exit view
+
   if (viewingAs === username) adminExitView();
-  // Rebuild switcher
   buildAdminUserSwitcher();
   toast('ลบผู้ใช้ ' + username + ' และข้อมูลทั้งหมดแล้ว', 'success');
   renderAdminPage();
 }
 
-function renderAdminPage() {
+async function renderAdminPage() {
   if (session?.role !== 'admin') return;
   const search = (document.getElementById('admin-search')?.value || '').toLowerCase();
-  let users = getAllUsers();
+  
+  let dbUsers = [];
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('gm_users').select('*');
+      if (error) throw error;
+      dbUsers = data || [];
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
-  // Aggregate stats across ALL users
-  const allRegistered = JSON.parse(localStorage.getItem('gold_users') || '[]');
+  const registered = JSON.parse(localStorage.getItem('gold_users') || '[]');
+  const bannedList  = JSON.parse(localStorage.getItem('gm_banned') || '[]');
+  const adminUser = { name: 'Sitthichok', username: 'sitthichok', role: 'admin', banned: false, isAdmin: true };
+  
+  let users = [];
+  if (supabase && dbUsers.length > 0) {
+    users = dbUsers.map(u => ({
+      name: u.name,
+      username: u.username,
+      role: u.role,
+      banned: u.banned,
+      isAdmin: u.role === 'admin'
+    }));
+  } else {
+    users = [adminUser, ...registered.map(u => ({
+      ...u,
+      role: 'user',
+      banned: bannedList.includes(u.username),
+      isAdmin: false
+    }))];
+  }
+
+  let allAccs = [];
+  let allTxs = [];
+  if (supabase) {
+    try {
+      const { data: accs } = await supabase.from('gm_accounts').select('*');
+      const { data: txs } = await supabase.from('gm_transactions').select('*');
+      allAccs = accs || [];
+      allTxs = txs || [];
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   let totalTx = 0, totalBal = 0;
-  allRegistered.forEach(u => {
-    const k = userKeys(u.username);
-    const utx  = JSON.parse(localStorage.getItem(k.txs)  || '[]');
-    const uacc = JSON.parse(localStorage.getItem(k.accs) || '[]');
-    totalTx += utx.length;
-    // Recalculate each account balance
-    uacc.forEach(acc => {
-      const inc = utx.filter(t=>t.type==='income'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
-      const exp = utx.filter(t=>t.type==='expense'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
-      totalBal += (acc.initialBalance||0) + inc - exp;
+  
+  if (supabase && dbUsers.length > 0) {
+    totalTx = allTxs.length;
+    allAccs.forEach(acc => {
+      const inc = allTxs.filter(t => t.type === 'income' && t.account_id === acc.id).reduce((s,t) => s + Number(t.amount || 0), 0);
+      const exp = allTxs.filter(t => t.type === 'expense' && t.account_id === acc.id).reduce((s,t) => s + Number(t.amount || 0), 0);
+      totalBal += Number(acc.initial_balance || 0) + inc - exp;
     });
-  });
+  } else {
+    const allRegistered = JSON.parse(localStorage.getItem('gold_users') || '[]');
+    allRegistered.forEach(u => {
+      const k = userKeys(u.username);
+      const utx  = JSON.parse(localStorage.getItem(k.txs)  || '[]');
+      const uacc = JSON.parse(localStorage.getItem(k.accs) || '[]');
+      totalTx += utx.length;
+      uacc.forEach(acc => {
+        const inc = utx.filter(t=>t.type==='income'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
+        const exp = utx.filter(t=>t.type==='expense'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
+        totalBal += (acc.initialBalance||0) + inc - exp;
+      });
+    });
+  }
 
   const total  = users.length;
   const banned = users.filter(u => u.banned).length;
@@ -2276,10 +2441,8 @@ function renderAdminPage() {
   document.getElementById('adm-total-tx').textContent     = totalTx;
   document.getElementById('adm-total-balance').textContent = fmtShort(totalBal);
 
-  // Badge
   document.getElementById('user-count-badge').textContent = total;
 
-  // Filter
   if (adminFilter === 'active') users = users.filter(u => !u.banned);
   if (adminFilter === 'banned') users = users.filter(u => u.banned);
   if (search) users = users.filter(u =>
@@ -2303,21 +2466,34 @@ function renderAdminPage() {
       ? '<span class="status-badge status-banned">🚫 บัน</span>'
       : '<span class="status-badge status-active">✅ ใช้งาน</span>';
 
-    // Per-user stats from their own storage
     let userTxCount = '-', userAccCount = '-', userBal = '-';
     if (!u.isAdmin) {
-      const k = userKeys(u.username);
-      const utx  = JSON.parse(localStorage.getItem(k.txs)  || '[]');
-      const uacc = JSON.parse(localStorage.getItem(k.accs) || '[]');
-      userTxCount  = utx.length;
-      userAccCount = uacc.length;
-      let bal = 0;
-      uacc.forEach(acc => {
-        const inc = utx.filter(t=>t.type==='income'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
-        const exp = utx.filter(t=>t.type==='expense'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
-        bal += (acc.initialBalance||0) + inc - exp;
-      });
-      userBal = fmtShort(bal);
+      if (supabase && dbUsers.length > 0) {
+        const uTxs = allTxs.filter(t => t.username === u.username);
+        const uAccs = allAccs.filter(a => a.username === u.username);
+        userTxCount = uTxs.length;
+        userAccCount = uAccs.length;
+        let bal = 0;
+        uAccs.forEach(acc => {
+          const inc = uTxs.filter(t => t.type === 'income' && t.account_id === acc.id).reduce((s,t) => s + Number(t.amount || 0), 0);
+          const exp = uTxs.filter(t => t.type === 'expense' && t.account_id === acc.id).reduce((s,t) => s + Number(t.amount || 0), 0);
+          bal += Number(acc.initial_balance || 0) + inc - exp;
+        });
+        userBal = fmtShort(bal);
+      } else {
+        const k = userKeys(u.username);
+        const utx  = JSON.parse(localStorage.getItem(k.txs)  || '[]');
+        const uacc = JSON.parse(localStorage.getItem(k.accs) || '[]');
+        userTxCount  = utx.length;
+        userAccCount = uacc.length;
+        let bal = 0;
+        uacc.forEach(acc => {
+          const inc = utx.filter(t=>t.type==='income'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
+          const exp = utx.filter(t=>t.type==='expense'&&t.accountId===acc.id).reduce((s,t)=>s+t.amount,0);
+          bal += (acc.initialBalance||0) + inc - exp;
+        });
+        userBal = fmtShort(bal);
+      }
     }
 
     const isViewing = viewingAs === u.username;
@@ -2328,8 +2504,8 @@ function renderAdminPage() {
           ${isViewing?'👁️ กำลังดู':'👁️ ดูข้อมูล'}
         </button>
         ${u.banned
-          ? `<button class="action-btn unban" onclick="unbanUser('${u.username}')">✅ ยกเลิกบัน</button>`
-          : `<button class="action-btn ban" onclick="banUser('${u.username}')">🚫 บัน</button>`
+          ? \`<button class="action-btn unban" onclick="unbanUser('${u.username}')">✅ ยกเลิกบัน</button>\`
+          : \`<button class="action-btn ban" onclick="banUser('${u.username}')">🚫 บัน</button>\`
         }
         <button class="action-btn del" onclick="deleteUser('${u.username}')">🗑️ ลบ</button>
       </div>`;
@@ -2352,27 +2528,205 @@ function renderAdminPage() {
 }
 
 // ══════════════════════════════════════════════════
+// ONBOARDING TOUR
+// ══════════════════════════════════════════════════
+const tourSteps = [
+  {
+    element: '.logo-mark',
+    title: '👋 ยินดีต้อนรับสู่ Gold Management!',
+    desc: 'ยินดีต้อนรับเข้าใช้งานระบบจัดการรายรับ-รายจ่ายยุคใหม่ครับ! ผมขอแนะนำการใช้งานสั้นๆ 5 ขั้นตอนครับ',
+    pos: 'right'
+  },
+  {
+    element: '#supabase-config-btn',
+    title: '☁️ ตั้งค่าระบบคลาวด์',
+    desc: 'คุณสามารถคลิกปุ่มนี้เพื่อกรอกข้อมูลการตั้งค่า Supabase เพื่อให้ข้อมูลซิงค์ออนไลน์และใช้งานได้หลายคนจากทุกที่ครับ',
+    pos: 'bottom'
+  },
+  {
+    element: '#nav-accounts',
+    title: '💳 จัดการบัญชีการเงิน',
+    desc: 'เมนูนี้ใช้สร้างและจัดการกระเป๋าเงินของคุณ เช่น บัญชีธนาคาร เงินสด หรือบัตรเครดิต เพื่อดูยอดเงินแยกกันได้ครับ',
+    pos: 'right'
+  },
+  {
+    element: '#nav-budget',
+    title: '📅 ค่าใช้จ่ายประจำ & งบประมาณ',
+    desc: 'เมนูสำหรับบันทึกค่าใช้จ่ายคงที่รายเดือน (เช่น ค่าหอพัก ค่าเน็ต) และคำนวณงบประมาณเงินที่ใช้จ่ายได้ในแต่ละวันแบบอัตโนมัติ!',
+    pos: 'right'
+  },
+  {
+    element: '#btn-add-tx',
+    title: '➕ บันทึกธุรกรรมรวดเร็ว',
+    desc: 'กดปุ่มเครื่องหมายบวกนี้เพื่อลงบันทึกรายรับหรือรายจ่ายใหม่ของคุณได้ทันทีจากทุกหน้าจอครับ!',
+    pos: 'bottom'
+  }
+];
+
+let currentTourStep = 0;
+
+function startTour() {
+  document.getElementById('tour-overlay').classList.add('show');
+  document.getElementById('tour-spotlight').classList.add('show');
+  document.getElementById('tour-card').classList.add('show');
+  
+  currentTourStep = 0;
+  showTourStep();
+}
+
+function showTourStep() {
+  if (currentTourStep < 0 || currentTourStep >= tourSteps.length) return;
+  const step = tourSteps[currentTourStep];
+  
+  const el = document.querySelector(step.element);
+  const spotlight = document.getElementById('tour-spotlight');
+  const card = document.getElementById('tour-card');
+  
+  if (el && el.getBoundingClientRect().width > 0) {
+    el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+    
+    // Position spotlight
+    const rect = el.getBoundingClientRect();
+    const padding = 8;
+    
+    spotlight.style.top = (rect.top - padding) + 'px';
+    spotlight.style.left = (rect.left - padding) + 'px';
+    spotlight.style.width = (rect.width + padding * 2) + 'px';
+    spotlight.style.height = (rect.height + padding * 2) + 'px';
+    
+    // Position card relative to element
+    const gap = 15;
+    let cardTop = 0;
+    let cardLeft = 0;
+    
+    if (step.pos === 'right') {
+      cardTop = rect.top + rect.height/2 - 90;
+      cardLeft = rect.right + gap;
+    } else if (step.pos === 'bottom') {
+      cardTop = rect.bottom + gap;
+      cardLeft = rect.left + rect.width/2 - 160;
+    } else if (step.pos === 'top') {
+      cardTop = rect.top - 180 - gap;
+      cardLeft = rect.left + rect.width/2 - 160;
+    } else {
+      cardTop = rect.top + rect.height/2 - 90;
+      cardLeft = rect.left - 320 - gap;
+    }
+    
+    // Boundary check for viewport
+    if (cardLeft < 10) cardLeft = 10;
+    if (cardLeft + 330 > window.innerWidth) cardLeft = window.innerWidth - 340;
+    if (cardTop < 10) cardTop = 10;
+    if (cardTop + 200 > window.innerHeight) cardTop = window.innerHeight - 210;
+    
+    card.style.top = cardTop + 'px';
+    card.style.left = cardLeft + 'px';
+  } else {
+    // Center fallback
+    card.style.top = '40%';
+    card.style.left = 'calc(50% - 160px)';
+    spotlight.style.top = '0px';
+    spotlight.style.left = '0px';
+    spotlight.style.width = '0px';
+    spotlight.style.height = '0px';
+  }
+  
+  // Fill content
+  document.getElementById('tour-title').innerHTML = step.title;
+  document.getElementById('tour-desc').innerHTML = step.desc;
+  document.getElementById('tour-progress').textContent = (currentTourStep + 1) + ' / ' + tourSteps.length;
+  
+  // Back button visibility
+  document.getElementById('tour-prev-btn').style.display = currentTourStep === 0 ? 'none' : 'block';
+  
+  // Next button text
+  const nextBtn = document.getElementById('tour-next-btn');
+  if (currentTourStep === tourSteps.length - 1) {
+    nextBtn.textContent = 'เสร็จสิ้น';
+  } else {
+    nextBtn.textContent = 'ถัดไป';
+  }
+}
+
+function nextTourStep() {
+  if (currentTourStep === tourSteps.length - 1) {
+    finishTour();
+  } else {
+    currentTourStep++;
+    showTourStep();
+  }
+}
+
+function prevTourStep() {
+  if (currentTourStep > 0) {
+    currentTourStep--;
+    showTourStep();
+  }
+}
+
+function skipTour() {
+  finishTour();
+}
+
+function finishTour() {
+  document.getElementById('tour-overlay').classList.remove('show');
+  document.getElementById('tour-spotlight').classList.remove('show');
+  document.getElementById('tour-card').classList.remove('show');
+  
+  if (session && session.username) {
+    localStorage.setItem('gm_tour_completed_' + session.username, 'true');
+  }
+}
+
+function checkTourTrigger() {
+  if (session && session.username) {
+    const completed = localStorage.getItem('gm_tour_completed_' + session.username);
+    if (!completed) {
+      setTimeout(startTour, 1200);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════
-function init() {
-  checkAuth();
-  loadUserData();
+async function init() {
+  initSupabase();
+  await checkAuth();
+  await loadUserData();
 
-  // Date display
   const now = new Date();
   document.getElementById('topbar-date').textContent =
     now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  // Set default date
   document.getElementById('tx-date').value = now.toISOString().split('T')[0];
 
   populateAccountSelect();
   updateActiveAccount();
   renderOverview();
   updateBadge();
+  
+  // Onboarding Tour Trigger
+  checkTourTrigger();
 }
 
 init();
 </script>
+
+  <!-- Tour Elements -->
+  <div id="tour-overlay" class="tour-overlay"></div>
+  <div id="tour-spotlight" class="tour-spotlight"></div>
+  <div id="tour-card" class="tour-card">
+    <div class="tour-title" id="tour-title">👋 ยินดีต้อนรับ</div>
+    <div class="tour-desc" id="tour-desc">คำอธิบายขั้นตอนการเรียนรู้</div>
+    <div class="tour-footer">
+      <div class="tour-progress" id="tour-progress">1 / 5</div>
+      <div class="tour-buttons">
+        <button class="tour-btn" onclick="skipTour()">ข้าม</button>
+        <button class="tour-btn" id="tour-prev-btn" onclick="prevTourStep()">ย้อนกลับ</button>
+        <button class="tour-btn tour-btn-primary" id="tour-next-btn" onclick="nextTourStep()">ถัดไป</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
