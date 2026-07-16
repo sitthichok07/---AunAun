@@ -620,7 +620,42 @@
       cursor:pointer;transition:border-color 0.2s;
     }
     .user-switcher:focus{border-color:var(--purple);}
+
+    /* Supabase config button & styling for dashboard */
+    .supabase-config-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      margin-left: 10px;
+    }
+    .supabase-config-btn:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+    .supabase-banner {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      text-align: center;
+      width: 100%;
+    }
   </style>
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -718,6 +753,10 @@
         </div>
       </div>
       <div class="topbar-right">
+        <!-- Supabase Configuration Button -->
+        <button id="supabase-config-btn" class="supabase-config-btn" onclick="openSupabaseModal()" title="ตั้งค่าระบบคลาวด์">
+          ⚙️ ตั้งค่าคลาวด์
+        </button>
         <!-- Account selector -->
         <div class="account-selector" onclick="goPage('accounts')" id="active-account-btn">
           <div class="account-dot"></div>
@@ -732,6 +771,10 @@
 
     <!-- Content -->
     <div class="content">
+      <!-- Supabase Notification Banner -->
+      <div id="supabase-banner" class="supabase-banner" style="display: none; box-sizing: border-box;">
+        ⚠️ ใช้ระบบความจำเครื่อง (Offline) ตั้งค่าการเชื่อมต่อฐานข้อมูลออนไลน์ได้ที่ปุ่มเฟืองขวาบน
+      </div>
 
       <!-- ────── PAGE: OVERVIEW ────── -->
       <div class="page active" id="page-overview">
@@ -1189,6 +1232,31 @@
   </div>
 </div>
 
+<!-- Supabase Config Modal -->
+<div class="modal-overlay" id="supabase-modal-overlay">
+  <div class="modal-box">
+    <span class="modal-icon">⚙️</span>
+    <h3 class="modal-title" style="margin-bottom: 4px;">ตั้งค่าคลาวด์</h3>
+    <p class="modal-desc" style="font-size: 13px; margin-bottom: 16px; color: var(--text-secondary);">
+      กรอกข้อมูล API จากบัญชี Supabase ของคุณเพื่อเชื่อมโยงระบบออนไลน์ หากว่างไว้ระบบจะใช้หน่วยความจำเครื่อง (LocalStorage)
+    </p>
+    <div style="text-align: left; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
+      <div>
+        <label style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; display: block;">Supabase Project URL</label>
+        <input type="text" id="db-url-input" class="form-input" style="width: 100%; box-sizing: border-box; background: var(--bg-input); border-color: var(--border); color: var(--text-primary); border-radius: 8px; padding: 10px 14px;" placeholder="https://xxxx.supabase.co" />
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; display: block;">Supabase Anon API Key</label>
+        <input type="password" id="db-key-input" class="form-input" style="width: 100%; box-sizing: border-box; background: var(--bg-input); border-color: var(--border); color: var(--text-primary); border-radius: 8px; padding: 10px 14px;" placeholder="eyJhbGciOi..." />
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+      <button class="modal-btn" style="background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);" onclick="closeSupabaseModal()">ยกเลิก</button>
+      <button class="modal-btn" style="background: var(--accent); color: #0b0e11; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; cursor: pointer;" onclick="saveSupabaseConfig()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════
 // STATE  (per-user data isolation)
@@ -1205,31 +1273,135 @@ function userKeys(uname) {
 
 let session    = JSON.parse(localStorage.getItem(KEY_USER) || 'null');
 let viewingAs  = null; // admin can view another user's data
-
-// Current active username (who's data we're viewing)
-function activeUser() {
-  return (session?.role === 'admin' && viewingAs) ? viewingAs : session?.username;
-}
-
-// Load data for the active user
-function loadUserData() {
-  const k = userKeys(activeUser());
-  accounts     = JSON.parse(localStorage.getItem(k.accs) || '[]');
-  transactions = JSON.parse(localStorage.getItem(k.txs)  || '[]');
-}
-
 let accounts     = [];
 let transactions = [];
+let fixedExpenses = [];
 let activeAccId  = null;
 let txFilter     = 'all';
 let deleteTargetId = null;
 let selectedColor  = '#f0b90b';
 let barChart, donutChart;
 
+// ─── Supabase Initialize ───
+let SUPABASE_URL = localStorage.getItem('gm_supabase_url') || '';
+let SUPABASE_KEY = localStorage.getItem('gm_supabase_key') || '';
+let supabase = null;
+
+function initSupabase() {
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      document.getElementById('supabase-banner').style.display = 'none';
+      document.getElementById('supabase-config-btn').innerHTML = '🟢 คลาวด์ออนไลน์';
+      document.getElementById('supabase-config-btn').style.borderColor = 'var(--income)';
+      document.getElementById('supabase-config-btn').style.color = 'var(--income)';
+    } catch (err) {
+      console.error('Supabase initialization failed:', err);
+      supabase = null;
+    }
+  }
+  if (!supabase) {
+    document.getElementById('supabase-banner').style.display = 'block';
+    document.getElementById('supabase-config-btn').innerHTML = '⚙️ ตั้งค่าคลาวด์';
+    document.getElementById('supabase-config-btn').style.borderColor = 'var(--border)';
+    document.getElementById('supabase-config-btn').style.color = '';
+  }
+}
+
+function openSupabaseModal() {
+  document.getElementById('db-url-input').value = SUPABASE_URL;
+  document.getElementById('db-key-input').value = SUPABASE_KEY;
+  document.getElementById('supabase-modal-overlay').classList.add('show');
+}
+
+function closeSupabaseModal() {
+  document.getElementById('supabase-modal-overlay').classList.remove('show');
+}
+
+function saveSupabaseConfig() {
+  const url = document.getElementById('db-url-input').value.trim();
+  const key = document.getElementById('db-key-input').value.trim();
+  
+  if (url) localStorage.setItem('gm_supabase_url', url);
+  else localStorage.removeItem('gm_supabase_url');
+  
+  if (key) localStorage.setItem('gm_supabase_key', key);
+  else localStorage.removeItem('gm_supabase_key');
+  
+  location.reload();
+}
+
+// Current active username
+function activeUser() {
+  return (session?.role === 'admin' && viewingAs) ? viewingAs : session?.username;
+}
+
+// Load data for the active user
+async function loadUserData() {
+  if (supabase) {
+    try {
+      const uname = activeUser();
+      
+      const { data: dbAccs, error: accError } = await supabase
+        .from('gm_accounts')
+        .select('*')
+        .eq('username', uname);
+      if (accError) throw accError;
+      accounts = (dbAccs || []).map(a => ({
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        balance: Number(a.balance || 0),
+        color: a.color,
+        initialBalance: Number(a.initial_balance || 0)
+      }));
+
+      const { data: dbTxs, error: txError } = await supabase
+        .from('gm_transactions')
+        .select('*')
+        .eq('username', uname);
+      if (txError) throw txError;
+      transactions = (dbTxs || []).map(t => ({
+        id: t.id,
+        type: t.type,
+        title: t.title,
+        amount: Number(t.amount || 0),
+        accountId: t.account_id,
+        category: t.category,
+        date: t.date,
+        note: t.note
+      }));
+      transactions.sort((a,b) => b.id.localeCompare(a.id));
+
+      const { data: dbFixed, error: fixedError } = await supabase
+        .from('gm_fixed_expenses')
+        .select('*')
+        .eq('username', uname);
+      if (fixedError) throw fixedError;
+      fixedExpenses = (dbFixed || []).map(f => ({
+        id: f.id,
+        name: f.name,
+        amt: Number(f.amt || 0),
+        emoji: f.emoji
+      }));
+      
+    } catch (err) {
+      console.error(err);
+      toast('โหลดข้อมูลจากคลาวด์ล้มเหลว: ' + err.message, 'error');
+    }
+  } else {
+    const uname = activeUser();
+    const k = userKeys(uname);
+    accounts     = JSON.parse(localStorage.getItem(k.accs) || '[]');
+    transactions = JSON.parse(localStorage.getItem(k.txs)  || '[]');
+    fixedExpenses = JSON.parse(localStorage.getItem('gm_fixed_exp_' + uname) || localStorage.getItem('gm_fixed_exp') || '[]');
+  }
+}
+
 // ══════════════════════════════════════════════════
 // AUTH CHECK
 // ══════════════════════════════════════════════════
-function checkAuth() {
+async function checkAuth() {
   if (!session) { window.location.href = 'login.html'; return; }
   document.getElementById('user-display-name').textContent = session.name || session.username;
   document.getElementById('user-display-role').textContent = session.role === 'admin' ? '👑 แอดมิน' : '👤 ผู้ใช้';
@@ -1238,27 +1410,40 @@ function checkAuth() {
   if (session.role === 'admin') {
     document.getElementById('user-avatar-text').style.background = 'linear-gradient(135deg,#c084fc,#a855f7)';
     document.getElementById('admin-nav-section').style.display = 'block';
-    buildAdminUserSwitcher();
+    await buildAdminUserSwitcher();
   }
 }
 
 // ══════════════════════════════════════════════════
 // ADMIN USER SWITCHER
 // ══════════════════════════════════════════════════
-function buildAdminUserSwitcher() {
+async function buildAdminUserSwitcher() {
   const sel = document.getElementById('admin-user-switcher');
   if (!sel) return;
-  const registered = JSON.parse(localStorage.getItem('gold_users') || '[]');
+  
+  let registered = [];
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('gm_users').select('username, name, role');
+      registered = (data || []).filter(u => u.role !== 'admin');
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  if (registered.length === 0) {
+    registered = JSON.parse(localStorage.getItem('gold_users') || '[]');
+  }
+  
   sel.innerHTML = `<option value="__self__">👑 ข้อมูลตัวเอง (Admin)</option>`
-    + registered.map(u => `<option value="${u.username}">👤 ${u.name} (${u.username})</option>`).join('');
+    + registered.map(u => `<option value="${u.username}">👤 ${u.name || u.username} (${u.username})</option>`).join('');
   sel.value = viewingAs || '__self__';
 }
 
-function adminSwitchUser(val) {
+async function adminSwitchUser(val) {
   if (session?.role !== 'admin') return;
   viewingAs = (val === '__self__') ? null : val;
   activeAccId = null;
-  loadUserData();
+  await loadUserData();
   updateViewingBanner();
   renderOverview();
   renderAccounts();
@@ -1269,13 +1454,10 @@ function adminSwitchUser(val) {
 }
 
 function updateViewingBanner() {
-  // Remove old banner if any
   document.querySelectorAll('.viewing-banner').forEach(b => b.remove());
   if (!viewingAs || session?.role !== 'admin') return;
 
-  const registered = JSON.parse(localStorage.getItem('gold_users') || '[]');
-  const u = registered.find(x => x.username === viewingAs);
-  const displayName = u ? `${u.name} (${viewingAs})` : viewingAs;
+  const displayName = viewingAs;
 
   const banner = document.createElement('div');
   banner.className = 'viewing-banner';
@@ -1290,12 +1472,12 @@ function updateViewingBanner() {
   content.insertBefore(banner, content.firstChild);
 }
 
-function adminExitView() {
+async function adminExitView() {
   viewingAs = null;
   const sel = document.getElementById('admin-user-switcher');
   if (sel) sel.value = '__self__';
   activeAccId = null;
-  loadUserData();
+  await loadUserData();
   document.querySelectorAll('.viewing-banner').forEach(b => b.remove());
   renderOverview();
   renderAccounts();
@@ -1311,13 +1493,12 @@ function logout() {
   window.location.href = 'login.html';
 }
 
-// ══════════════════════════════════════════════════
-// SAVE  (always saves to the currently-viewed user's keys)
-// ══════════════════════════════════════════════════
-function saveAll() {
-  const k = userKeys(activeUser());
+function saveAllLocalStorage() {
+  const uname = activeUser();
+  const k = userKeys(uname);
   localStorage.setItem(k.accs, JSON.stringify(accounts));
   localStorage.setItem(k.txs,  JSON.stringify(transactions));
+  localStorage.setItem('gm_fixed_exp_' + uname, JSON.stringify(fixedExpenses));
 }
 
 // ══════════════════════════════════════════════════
@@ -1386,13 +1567,29 @@ function selectColor(el) {
   selectedColor = el.dataset.color;
 }
 
-function saveAccount() {
+async function saveAccount() {
   const name    = document.getElementById('acc-name').value.trim();
   const type    = document.getElementById('acc-type').value;
   const balance = parseFloat(document.getElementById('acc-balance').value) || 0;
   if (!name) { toast('กรุณากรอกชื่อบัญชี','error'); return; }
-  accounts.push({ id: Date.now().toString(), name, type, balance, color: selectedColor, initialBalance: balance });
-  saveAll();
+  
+  const newAcc = { id: Date.now().toString(), username: activeUser(), name, type, balance, color: selectedColor, initial_balance: balance };
+  
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_accounts').insert([newAcc]);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
+  const uiAcc = { id: newAcc.id, name: newAcc.name, type: newAcc.type, balance: newAcc.balance, color: newAcc.color, initialBalance: balance };
+  accounts.push(uiAcc);
+  saveAllLocalStorage();
+
   closeModal('modal-account');
   renderAccounts();
   populateAccountSelect();
@@ -1400,11 +1597,23 @@ function saveAccount() {
   toast('เพิ่มบัญชีสำเร็จ','success');
 }
 
-function deleteAccount(id) {
+async function deleteAccount(id) {
+  if (!confirm('ลบบัญชีและรายการทั้งหมดในบัญชีนี้?')) return;
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_accounts').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
   accounts = accounts.filter(a => a.id !== id);
   transactions = transactions.filter(t => t.accountId !== id);
   if (activeAccId === id) activeAccId = null;
-  saveAll();
+  saveAllLocalStorage();
   renderAccounts();
   populateAccountSelect();
   updateActiveAccount();
@@ -1512,7 +1721,7 @@ function populateAccountSelect() {
   sel.innerHTML = accounts.map(a => `<option value="${a.id}" ${a.id===activeAccId?'selected':''}>${a.name}</option>`).join('');
 }
 
-function addTransaction() {
+async function addTransaction() {
   const title   = document.getElementById('tx-title').value.trim();
   const amount  = parseFloat(document.getElementById('tx-amount').value);
   const accId   = document.getElementById('tx-account-select').value;
@@ -1524,14 +1733,28 @@ function addTransaction() {
   if (!amount || amount <= 0) { toast('กรุณากรอกจำนวนเงินที่ถูกต้อง','error'); return; }
   if (!accId)  { toast('กรุณาเพิ่มบัญชีก่อน','error'); return; }
 
-  transactions.unshift({ id: Date.now().toString(), type: txType, title, amount, accountId: accId, category: cat, date, note });
-  saveAll();
+  const newTx = { id: Date.now().toString(), username: activeUser(), account_id: accId, type: txType, title, amount, category: cat, date, note };
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_transactions').insert([newTx]);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
+  const uiTx = { id: newTx.id, type: newTx.type, title: newTx.title, amount: newTx.amount, accountId: newTx.account_id, category: newTx.category, date: newTx.date, note: newTx.note };
+  transactions.unshift(uiTx);
+  saveAllLocalStorage();
+
   renderTxList();
   renderOverview();
   renderAccounts();
   updateBadge();
 
-  // Clear
   document.getElementById('tx-title').value  = '';
   document.getElementById('tx-amount').value = '';
   document.getElementById('tx-note').value   = '';
@@ -1582,9 +1805,20 @@ function promptDelete(id) {
   deleteTargetId = id;
   openModal('modal-delete');
 }
-function confirmDelete() {
+async function confirmDelete() {
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_transactions').delete().eq('id', deleteTargetId);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
   transactions = transactions.filter(t => t.id !== deleteTargetId);
-  saveAll();
+  saveAllLocalStorage();
   renderTxList();
   renderOverview();
   renderAccounts();
@@ -1756,29 +1990,51 @@ function updateBadge() {
 // ══════════════════════════════════════════════════
 // BUDGET CALCULATOR
 // ══════════════════════════════════════════════════
-let fixedExpenses = JSON.parse(localStorage.getItem('gm_fixed_exp') || '[]');
 let budgetChart = null;
 
-function saveFixed() {
-  localStorage.setItem('gm_fixed_exp', JSON.stringify(fixedExpenses));
-}
-
-function addFixedExpense() {
+async function addFixedExpense() {
   const name  = document.getElementById('fixed-name').value.trim();
   const amt   = parseFloat(document.getElementById('fixed-amt').value);
   const emoji = document.getElementById('fixed-emoji').value;
   if (!name || !amt || amt <= 0) { toast('กรุณากรอกชื่อและจำนวนเงิน', 'error'); return; }
-  fixedExpenses.push({ id: Date.now().toString(), name, amt, emoji });
-  saveFixed();
+
+  const newFixed = { id: Date.now().toString(), username: activeUser(), name, amt, emoji };
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_fixed_expenses').insert([newFixed]);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
+  const uiFixed = { id: newFixed.id, name: newFixed.name, amt: newFixed.amt, emoji: newFixed.emoji };
+  fixedExpenses.push(uiFixed);
+  saveAllLocalStorage();
+
   document.getElementById('fixed-name').value = '';
   document.getElementById('fixed-amt').value  = '';
   renderFixedList();
   calcBudget();
 }
 
-function removeFixed(id) {
+async function removeFixed(id) {
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('gm_fixed_expenses').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      toast('ล้มเหลวบนคลาวด์: ' + err.message, 'error');
+      return;
+    }
+  }
+
   fixedExpenses = fixedExpenses.filter(f => f.id !== id);
-  saveFixed();
+  saveAllLocalStorage();
   renderFixedList();
   calcBudget();
 }
