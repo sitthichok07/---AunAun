@@ -918,8 +918,10 @@
   const ADMIN_CREDENTIALS = { username: 'sitthichok', password: '1234' };
 
   // ─── Supabase Initialize ───
-  let SUPABASE_URL = localStorage.getItem('gm_supabase_url') || '';
-  let SUPABASE_KEY = localStorage.getItem('gm_supabase_key') || '';
+  const DEFAULT_SUPABASE_URL = 'https://uibpetlfwbramxmcblha.supabase.co';
+  const DEFAULT_SUPABASE_KEY = 'sb_publishable__-E906VgJ7uF8MysRQLJDg_L-W6KiOB';
+  let SUPABASE_URL = localStorage.getItem('gm_supabase_url') || DEFAULT_SUPABASE_URL;
+  let SUPABASE_KEY = localStorage.getItem('gm_supabase_key') || DEFAULT_SUPABASE_KEY;
   let dbClient = null;
 
   function initdbClient() {
