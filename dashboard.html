@@ -654,7 +654,54 @@
       width: 100%;
     }
   
-    /* ══ ONBOARDING TOUR ═════════════════════════ */
+    
+    /* ══ MINI CALENDAR ═══════════════════════════ */
+    .calendar-grid-header {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .calendar-grid-body {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+    .calendar-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+    .calendar-day.empty {
+      visibility: hidden;
+    }
+    .calendar-day.today {
+      background: var(--accent);
+      color: #0b0e11;
+      font-weight: 800;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    .calendar-day.remaining {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px dashed rgba(240, 185, 11, 0.25);
+    }
+    .calendar-day.past {
+      color: var(--text-muted);
+      text-decoration: line-through;
+      opacity: 0.4;
+    }
+/* ══ ONBOARDING TOUR ═════════════════════════ */
     .tour-overlay {
       position: fixed;
       top: 0;
@@ -1116,6 +1163,18 @@
             <button class="btn-primary" onclick="syncIncomeFromTx()" style="margin-bottom:0;">
               🔄 ดึงรายรับจากรายการอัตโนมัติ
             </button>
+          </div>
+
+          <!-- 📅 Mini Calendar Card -->
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <div class="card-title" id="calendar-title">📅 ปฏิทินเดือนนี้</div>
+              <span class="days-left-badge" id="calendar-days-left" style="font-size: 11px; padding: 4px 8px; font-weight: 700; background: var(--accent-dim); color: var(--accent); border-radius: 20px;">เหลือ 0 วัน</span>
+            </div>
+            <div class="calendar-grid-header">
+              <div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div>
+            </div>
+            <div class="calendar-grid-body" id="calendar-body"></div>
           </div>
 
           <!-- RIGHT: ค่าใช้จ่ายคงที่ -->
@@ -1632,7 +1691,8 @@ function goPage(p) {
   if (p==='overview') renderOverview();
   if (p==='transactions') { renderTxList(); populateAccountSelect(); }
   if (p==='accounts') renderAccounts();
-  if (p==='budget') { syncIncomeFromTx(); calcBudget(); }
+  if (p==='budget') { loadBudgetSettings(); saveBudgetSettings();
+  calcBudget(); }
   if (p==='admin' && session?.role==='admin') renderAdminPage();
   closeSidebar();
 }
@@ -2169,6 +2229,82 @@ function syncIncomeFromTx() {
   calcBudget();
 }
 
+
+function saveBudgetSettings() {
+  const uname = activeUser();
+  if (!uname) return;
+  const income = document.getElementById('bgt-income').value;
+  const saving = document.getElementById('bgt-saving').value;
+  const startDay = document.getElementById('bgt-start-day').value;
+  const settings = { income, saving, startDay };
+  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify(settings));
+}
+
+function loadBudgetSettings() {
+  const uname = activeUser();
+  if (!uname) return;
+  const stored = localStorage.getItem(`gm_budget_settings_${uname}`);
+  if (stored) {
+    const settings = JSON.parse(stored);
+    document.getElementById('bgt-income').value = settings.income || '';
+    document.getElementById('bgt-saving').value = settings.saving || '';
+    document.getElementById('bgt-start-day').value = settings.startDay || 'today';
+  } else {
+    // If no stored settings, pull from transactions silently on first view
+    const now = new Date();
+    const monthlyInc = transactions
+      .filter(t => t.type==='income' && new Date(t.date).getFullYear()===now.getFullYear() && new Date(t.date).getMonth()===now.getMonth())
+      .reduce((s,t) => s+t.amount, 0);
+    document.getElementById('bgt-income').value = monthlyInc || '';
+  }
+}
+
+function renderMiniCalendar() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+
+  const monthNames = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
+  document.getElementById('calendar-title').textContent = `📅 ปฏิทินเดือน${monthNames[month]} ${year + 543}`;
+
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const lastDayDate = new Date(year, month + 1, 0).getDate();
+
+  const calBody = document.getElementById('calendar-body');
+  if (!calBody) return;
+  calBody.innerHTML = '';
+
+  // Render empty cells for offset
+  for (let i = 0; i < firstDayIndex; i++) {
+    const emptyCell = document.createElement('div');
+    emptyCell.className = 'calendar-day empty';
+    calBody.appendChild(emptyCell);
+  }
+
+  const daysLeft = lastDayDate - today + 1;
+  document.getElementById('calendar-days-left').textContent = `เหลืออีก ${daysLeft} วัน`;
+
+  // Render days
+  for (let day = 1; day <= lastDayDate; day++) {
+    const dayCell = document.createElement('div');
+    dayCell.textContent = day;
+
+    if (day === today) {
+      dayCell.className = 'calendar-day today';
+    } else if (day > today) {
+      dayCell.className = 'calendar-day remaining';
+    } else {
+      dayCell.className = 'calendar-day past';
+    }
+
+    calBody.appendChild(dayCell);
+  }
+}
+
 function calcBudget() {
   const now    = new Date();
   const income = parseFloat(document.getElementById('bgt-income')?.value) || 0;
@@ -2232,6 +2368,8 @@ function calcBudget() {
 
   renderFixedList();
   renderBudgetChart(income, saving, fixedTotal, available - fixedTotal - saving);
+  saveBudgetSettings();
+  renderMiniCalendar();
 }
 
 function renderBudgetChart(income, saving, fixed, daily) {
