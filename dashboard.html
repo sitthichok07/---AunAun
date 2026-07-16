@@ -1788,7 +1788,7 @@ function renderAccounts() {
         <td style="padding:12px 14px;text-align:right;font-weight:800;font-size:16px;color:var(--accent);">${fmt(totalBal)}</td>
       </tr></tfoot>
     </table>`;
-  saveAll();
+  saveAllLocalStorage();
 }
 
 function addAccountCardHTML() {
@@ -1935,7 +1935,7 @@ function renderOverview() {
     const exp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
     acc.balance = acc.initialBalance + inc - exp;
   });
-  saveAll();
+  saveAllLocalStorage();
 
   const now = new Date();
   let list = activeAccId ? transactions.filter(t=>t.accountId===activeAccId) : transactions;
