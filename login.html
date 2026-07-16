@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เข้าสู่ระบบ | Gold Management</title>
+  <meta name="description" content="เข้าสู่ระบบระบบจัดการรายรับ-รายจ่าย Gold Management สำหรับผู้ใช้ทั่วไปและแอดมิน" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0b0e11;
+      --bg-secondary: #161a1e;
+      --bg-card: #1e2329;
+      --bg-input: #2b3139;
+      --bg-input-focus: #363d47;
+      --border-color: #2b3139;
+      --border-focus: #f0b90b;
+      --accent: #f0b90b;
+      --accent-hover: #d9a50a;
+      --accent-glow: rgba(240, 185, 11, 0.3);
+      --accent-dim: rgba(240, 185, 11, 0.1);
+      --text-primary: #eaecef;
+      --text-secondary: #848e9c;
+      --text-muted: #5e6673;
+      --success: #03c087;
+      --error: #f6465d;
+      --admin-accent: #c084fc;
+      --admin-glow: rgba(192, 132, 252, 0.3);
+      --admin-dim: rgba(192, 132, 252, 0.1);
+      --admin-border: #c084fc;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    /* ─── Background ─── */
+    .bg-wrapper {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(240,185,11,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(240,185,11,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+    .bg-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      animation: pulse-orb 6s ease-in-out infinite alternate;
+    }
+    .bg-orb-1 {
+      width: 500px; height: 500px;
+      top: -150px; left: -100px;
+      background: radial-gradient(circle, rgba(240,185,11,0.18) 0%, transparent 70%);
+    }
+    .bg-orb-2 {
+      width: 400px; height: 400px;
+      bottom: -120px; right: -80px;
+      background: radial-gradient(circle, rgba(192,132,252,0.15) 0%, transparent 70%);
+      animation-delay: -3s;
+    }
+    .bg-orb-3 {
+      width: 300px; height: 300px;
+      top: 40%; right: 15%;
+      background: radial-gradient(circle, rgba(3,192,135,0.1) 0%, transparent 70%);
+      animation-delay: -1.5s;
+    }
+    @keyframes pulse-orb {
+      from { opacity: 0.6; transform: scale(1); }
+      to   { opacity: 1;   transform: scale(1.1); }
+    }
+
+    /* ─── Page Layout ─── */
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    /* ─── Header / Logo ─── */
+    .logo-section {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .logo-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #f0b90b, #d9a50a);
+      border-radius: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 0 32px var(--accent-glow), 0 4px 16px rgba(0,0,0,0.4);
+      animation: float 3s ease-in-out infinite;
+    }
+    .logo-icon svg { width: 36px; height: 36px; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-6px); }
+    }
+    .logo-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #f0b90b 30%, #ffd54f);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+    }
+
+    /* ─── Tab Switcher ─── */
+    .tab-switcher {
+      display: flex;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 5px;
+      margin-bottom: 28px;
+      gap: 4px;
+      width: 100%;
+      max-width: 440px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+      background: transparent;
+      color: var(--text-secondary);
+    }
+    .tab-btn.active-user {
+      background: linear-gradient(135deg, #f0b90b, #d9a50a);
+      color: #0b0e11;
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+    .tab-btn.active-admin {
+      background: linear-gradient(135deg, #c084fc, #a855f7);
+      color: #fff;
+      box-shadow: 0 0 16px var(--admin-glow);
+    }
+    .tab-btn:not(.active-user):not(.active-admin):hover {
+      background: var(--bg-input);
+      color: var(--text-primary);
+    }
+    .tab-icon { margin-right: 6px; }
+
+    /* ─── Card ─── */
+    .card-wrapper {
+      width: 100%;
+      max-width: 440px;
+    }
+    .card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 36px 32px;
+      border: 1px solid var(--border-color);
+      box-shadow:
+        0 4px 6px rgba(0,0,0,0.4),
+        0 20px 60px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .card.admin-mode::before {
+      background: linear-gradient(90deg, transparent, var(--admin-accent), transparent);
+      opacity: 1;
+    }
+    .card.user-mode::before {
+      opacity: 1;
+    }
+
+    /* ─── Panel System ─── */
+    .panel { display: none; }
+    .panel.active { display: block; animation: fadeSlide 0.35s ease; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Sub-tabs (Login / Register) ─── */
+    .sub-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .sub-tab {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.2s;
+    }
+    .sub-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .sub-tab:hover:not(.active) { color: var(--text-primary); }
+
+    /* ─── Form Elements ─── */
+    .form-heading {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .form-heading.admin { color: var(--admin-accent); }
+    .form-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .input-wrapper {
+      position: relative;
+    }
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      transition: color 0.2s;
+      display: flex;
+      align-items: center;
+    }
+    .form-input {
+      width: 100%;
+      padding: 13px 14px 13px 44px;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border-color);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .form-input::placeholder { color: var(--text-muted); }
+    .form-input:focus {
+      border-color: var(--border-focus);
+      background: var(--bg-input-focus);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .admin-mode .form-input:focus {
+      border-color: var(--admin-border);
+      box-shadow: 0 0 0 3px var(--admin-dim);
+    }
+    .form-input:focus ~ .input-icon,
+    .input-wrapper:focus-within .input-icon { color: var(--accent); }
+    .admin-mode .input-wrapper:focus-within .input-icon { color: var(--admin-accent); }
+
+    /* Eye toggle */
+    .eye-btn {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+    }
+    .eye-btn:hover { color: var(--accent); }
+    .form-input.has-eye { padding-right: 44px; }
+
+    /* ─── Submit Button ─── */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 0.3px;
+    }
+    .btn-user {
+      background: linear-gradient(135deg, #f0b90b, #d9a50a);
+      color: #0b0e11;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .btn-user:hover {
+      background: linear-gradient(135deg, #ffd54f, #f0b90b);
+      box-shadow: 0 6px 28px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+    .btn-user:active { transform: translateY(0); }
+    .btn-admin {
+      background: linear-gradient(135deg, #c084fc, #a855f7);
+      color: #fff;
+      box-shadow: 0 4px 20px var(--admin-glow);
+    }
+    .btn-admin:hover {
+      background: linear-gradient(135deg, #d8b4fe, #c084fc);
+      box-shadow: 0 6px 28px var(--admin-glow);
+      transform: translateY(-1px);
+    }
+    .btn-admin:active { transform: translateY(0); }
+
+    /* Button shimmer */
+    .btn-submit::after {
+      content: '';
+      position: absolute;
+      top: -50%; left: -60%;
+      width: 50%; height: 200%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transform: skewX(-20deg);
+      transition: left 0.4s ease;
+    }
+    .btn-submit:hover::after { left: 120%; }
+
+    /* ─── Extras ─── */
+    .form-extras {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+      user-select: none;
+    }
+    .remember-me input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .forgot-link {
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s, opacity 0.2s;
+    }
+    .forgot-link:hover { opacity: 0.8; }
+    .admin-mode .forgot-link { color: var(--admin-accent); }
+
+    /* ─── Divider ─── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    /* ─── Alert Messages ─── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      animation: fadeSlide 0.3s ease;
+    }
+    .alert.show { display: flex; }
+    .alert-error {
+      background: rgba(246, 70, 93, 0.12);
+      border: 1px solid rgba(246, 70, 93, 0.3);
+      color: #f6465d;
+    }
+    .alert-success {
+      background: rgba(3, 192, 135, 0.12);
+      border: 1px solid rgba(3, 192, 135, 0.3);
+      color: #03c087;
+    }
+
+    /* ─── Admin Badge ─── */
+    .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--admin-dim);
+      border: 1px solid rgba(192,132,252,0.3);
+      color: var(--admin-accent);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      letter-spacing: 0.4px;
+    }
+    .admin-badge span { animation: blink 2s step-end infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ─── Password Strength ─── */
+    .strength-bar {
+      margin-top: 8px;
+      display: flex;
+      gap: 4px;
+    }
+    .strength-segment {
+      flex: 1;
+      height: 3px;
+      border-radius: 3px;
+      background: var(--border-color);
+      transition: background 0.3s;
+    }
+    .strength-segment.weak   { background: var(--error); }
+    .strength-segment.medium { background: #f0b90b; }
+    .strength-segment.strong { background: var(--success); }
+    .strength-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+
+    /* ─── Footer ─── */
+    .page-footer {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .page-footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .page-footer a:hover { color: var(--accent); }
+
+    /* ─── Modal / Notification ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .modal-box {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 40px 36px;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      transform: scale(0.9);
+      transition: transform 0.3s;
+    }
+    .modal-overlay.show .modal-box { transform: scale(1); }
+    .modal-icon {
+      font-size: 52px;
+      margin-bottom: 16px;
+      display: block;
+    }
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .modal-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .modal-btn {
+      padding: 12px 32px;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #f0b90b, #d9a50a);
+      color: #0b0e11;
+      transition: all 0.2s;
+    }
+    .modal-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .modal-btn.admin-btn {
+      background: linear-gradient(135deg, #c084fc, #a855f7);
+      color: #fff;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .card { padding: 28px 20px; }
+      .tab-switcher { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-wrapper">
+  <div class="bg-grid"></div>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+</div>
+
+<!-- Page -->
+<main class="page">
+
+  <!-- Logo -->
+  <div class="logo-section">
+    <div class="logo-icon">
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Coin outer ring -->
+        <circle cx="18" cy="18" r="15" fill="#0b0e11" stroke="#0b0e11" stroke-width="0.5"/>
+        <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="1.5"/>
+        <!-- Inner detail ring -->
+        <circle cx="18" cy="18" r="10" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1"/>
+        <!-- Baht symbol -->
+        <text x="18" y="23" text-anchor="middle" font-family="serif" font-size="14" font-weight="900" fill="#0b0e11">฿</text>
+      </svg>
+    </div>
+    <div class="logo-title">Gold Management</div>
+    <div class="logo-subtitle">ระบบจัดการรายรับ-รายจ่าย</div>
+  </div>
+
+  <!-- Tab Switcher -->
+  <div class="tab-switcher">
+    <button class="tab-btn active-user" id="tab-user" onclick="switchTab('user')">
+      <span class="tab-icon">👤</span>ผู้ใช้ทั่วไป
+    </button>
+    <button class="tab-btn" id="tab-admin" onclick="switchTab('admin')">
+      <span class="tab-icon">🛡️</span>แอดมิน
+    </button>
+  </div>
+
+  <!-- Card -->
+  <div class="card-wrapper">
+    <div class="card user-mode" id="main-card">
+
+      <!-- ════════ USER PANEL ════════ -->
+      <div class="panel active" id="panel-user">
+
+        <!-- Sub-tabs -->
+        <div class="sub-tabs">
+          <button class="sub-tab active" id="sub-login" onclick="switchSubTab('login')">เข้าสู่ระบบ</button>
+          <button class="sub-tab" id="sub-register" onclick="switchSubTab('register')">ลงทะเบียน</button>
+        </div>
+
+        <!-- User Login Form -->
+        <div id="form-login" class="sub-panel">
+          <h1 class="form-heading">ยินดีต้อนรับ</h1>
+          <p class="form-desc">กรุณาเข้าสู่ระบบเพื่อจัดการรายรับ-รายจ่ายของคุณ</p>
+
+          <div class="alert alert-error" id="login-error">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span id="login-error-msg">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</span>
+          </div>
+
+          <form onsubmit="handleUserLogin(event)">
+            <div class="form-group">
+              <label class="form-label">ชื่อผู้ใช้</label>
+              <div class="input-wrapper">
+                <span class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <input type="text" id="login-username" class="form-input" placeholder="กรอกชื่อผู้ใช้" autocomplete="username" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">รหัสผ่าน</label>
+              <div class="input-wrapper">
+                <span class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
+                <input type="password" id="login-password" class="form-input has-eye" placeholder="กรอกรหัสผ่าน" autocomplete="current-password" required />
+                <button type="button" class="eye-btn" onclick="toggleEye('login-password', this)" aria-label="แสดง/ซ่อนรหัสผ่าน">
+                  <svg id="eye-login" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-extras">
+              <label class="remember-me">
+                <input type="checkbox" id="remember-me" />
+                จดจำฉัน
+              </label>
+              <a href="#" class="forgot-link">ลืมรหัสผ่าน?</a>
+            </div>
+            <button type="submit" id="btn-login" class="btn-submit btn-user">เข้าสู่ระบบ</button>
+          </form>
+
+          <div class="divider">หรือ</div>
+          <p style="text-align:center; font-size:13px; color:var(--text-secondary);">
+            ยังไม่มีบัญชี?
+            <a href="#" style="color:var(--accent); font-weight:600; text-decoration:none;" onclick="switchSubTab('register')">ลงทะเบียนเลย</a>
+          </p>
+        </div>
+
+        <!-- User Register Form -->
+        <div id="form-register" class="sub-panel" style="display:none;">
+          <h2 class="form-heading">สร้างบัญชีใหม่</h2>
+          <p class="form-desc">กรอกข้อมูลด้านล่างเพื่อลงทะเบียนใช้งานระบบ</p>
+
+          <div class="alert alert-error" id="reg-error">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span id="reg-error-msg">กรุณากรอกข้อมูลให้ครบถ้วน</span>
+          </div>
+          <div class="alert alert-success" id="reg-success">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M5 8l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>ลงทะเบียนสำเร็จ! กรุณาเข้าสู่ระบบ</span>
+          </div>
+
+          <form onsubmit="handleRegister(event)">
+            <div class="form-group">
+              <label class="form-label">ชื่อ-นามสกุล</label>
+              <div class="input-wrapper">
+                <span class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <input type="text" id="reg-name" class="form-input" placeholder="กรอกชื่อ-นามสกุล" autocomplete="name" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ชื่อผู้ใช้</label>
+              <div class="input-wrapper">
+                <span class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </span>
+                <input type="text" id="reg-username" class="form-input" placeholder="ตั้งชื่อผู้ใช้" autocomplete="username" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">รหัสผ่าน</label>
+              <div class="input-wrapper">
+                <span class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
+                <input type="password" id="reg-password" class="form-input has-eye" placeholder="ตั้งรหัสผ่าน (อย่างน้อย 6 ตัว)" autocomplete="new-password" required oninput="checkStrength(this.value)" />
+                <button type="button" class="eye-btn" onclick="toggleEye('reg-password', this)" aria-label="แสดง/ซ่อนรหัสผ่าน">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <div class="strength-bar">
+                <div class="strength-segment" id="str-1"></div>
+                <div class="strength-segment" id="str-2"></div>
+                <div class="strength-segment" id="str-3"></div>
+                <div class="strength-segment" id="str-4"></div>
+              </div>
+              <div class="strength-text" id="str-text">ความปลอดภัยรหัสผ่าน</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ยืนยันรหัสผ่าน</label>
+              <div class="input-wrapper">
+                <span class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </span>
+                <input type="password" id="reg-confirm" class="form-input has-eye" placeholder="กรอกรหัสผ่านอีกครั้ง" autocomplete="new-password" required />
+                <button type="button" class="eye-btn" onclick="toggleEye('reg-confirm', this)" aria-label="แสดง/ซ่อนรหัสผ่าน">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <button type="submit" class="btn-submit btn-user" style="margin-top:4px;">สร้างบัญชี</button>
+          </form>
+          <div class="divider">หรือ</div>
+          <p style="text-align:center; font-size:13px; color:var(--text-secondary);">
+            มีบัญชีอยู่แล้ว?
+            <a href="#" style="color:var(--accent); font-weight:600; text-decoration:none;" onclick="switchSubTab('login')">เข้าสู่ระบบ</a>
+          </p>
+        </div>
+      </div>
+
+      <!-- ════════ ADMIN PANEL ════════ -->
+      <div class="panel" id="panel-admin">
+        <div class="admin-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l3.09 6.26L22 8.27l-5 4.87 1.18 6.88L12 16.77l-6.18 3.25L7 13.14 2 8.27l6.91-1.01L12 1z"/></svg>
+          <span>●</span> โหมดแอดมิน
+        </div>
+
+        <h2 class="form-heading admin">เข้าสู่ระบบแอดมิน</h2>
+        <p class="form-desc">สำหรับผู้ดูแลระบบเท่านั้น กรุณาใช้ข้อมูลเข้าสู่ระบบของแอดมิน</p>
+
+        <div class="alert alert-error" id="admin-error">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span id="admin-error-msg">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</span>
+        </div>
+
+        <form onsubmit="handleAdminLogin(event)">
+          <div class="form-group">
+            <label class="form-label">ชื่อผู้ใช้แอดมิน</label>
+            <div class="input-wrapper">
+              <span class="input-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <input type="text" id="admin-username" class="form-input" placeholder="กรอกชื่อผู้ใช้แอดมิน" autocomplete="username" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">รหัสผ่านแอดมิน</label>
+            <div class="input-wrapper">
+              <span class="input-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </span>
+              <input type="password" id="admin-password" class="form-input has-eye" placeholder="กรอกรหัสผ่านแอดมิน" autocomplete="current-password" required />
+              <button type="button" class="eye-btn" onclick="toggleEye('admin-password', this)" aria-label="แสดง/ซ่อนรหัสผ่าน">
+                <svg id="eye-admin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-extras" style="justify-content:flex-end;">
+            <a href="#" class="forgot-link" style="color:var(--admin-accent);">ลืมรหัสผ่าน?</a>
+          </div>
+          <button type="submit" class="btn-submit btn-admin">เข้าสู่ระบบแอดมิน</button>
+        </form>
+
+        <div class="divider">ความปลอดภัย</div>
+        <p style="text-align:center; font-size:12px; color:var(--text-muted); line-height:1.6;">
+          🔒 การเข้าสู่ระบบแอดมินถูกบันทึกทุกครั้ง<br/>
+          กรุณาอย่าแชร์ข้อมูลนี้กับผู้อื่น
+        </p>
+      </div>
+
+    </div><!-- /card -->
+  </div><!-- /card-wrapper -->
+
+  <div class="page-footer">
+    &copy; 2026 Gold Management &nbsp;·&nbsp;
+    <a href="#">นโยบายความเป็นส่วนตัว</a> &nbsp;·&nbsp;
+    <a href="#">ติดต่อเรา</a>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <span class="modal-icon" id="modal-icon">✅</span>
+    <h3 class="modal-title" id="modal-title">เข้าสู่ระบบสำเร็จ</h3>
+    <p class="modal-desc" id="modal-desc">ยินดีต้อนรับ! กำลังพาคุณไปยังหน้าหลัก...</p>
+    <button class="modal-btn" id="modal-btn" onclick="closeModal()">ตกลง</button>
+  </div>
+</div>
+
+<script>
+  // ─── State ───
+  let currentTab = 'user';
+  let currentSubTab = 'login';
+  let users = JSON.parse(localStorage.getItem('gold_users') || '[]');
+
+  const ADMIN_CREDENTIALS = { username: 'sitthichok', password: '1234' };
+
+  // ─── Tab Switching ───
+  function switchTab(tab) {
+    currentTab = tab;
+    const card = document.getElementById('main-card');
+    const tabUser  = document.getElementById('tab-user');
+    const tabAdmin = document.getElementById('tab-admin');
+    const panelUser  = document.getElementById('panel-user');
+    const panelAdmin = document.getElementById('panel-admin');
+
+    if (tab === 'user') {
+      card.className = 'card user-mode';
+      tabUser.className = 'tab-btn active-user';
+      tabAdmin.className = 'tab-btn';
+      panelUser.classList.add('active');
+      panelAdmin.classList.remove('active');
+    } else {
+      card.className = 'card admin-mode';
+      tabAdmin.className = 'tab-btn active-admin';
+      tabUser.className = 'tab-btn';
+      panelAdmin.classList.add('active');
+      panelUser.classList.remove('active');
+    }
+    hideAllAlerts();
+  }
+
+  // ─── Sub-tab Switching ───
+  function switchSubTab(sub) {
+    currentSubTab = sub;
+    document.getElementById('sub-login').className    = 'sub-tab' + (sub === 'login' ? ' active' : '');
+    document.getElementById('sub-register').className = 'sub-tab' + (sub === 'register' ? ' active' : '');
+    document.getElementById('form-login').style.display    = sub === 'login'    ? 'block' : 'none';
+    document.getElementById('form-register').style.display = sub === 'register' ? 'block' : 'none';
+    hideAllAlerts();
+  }
+
+  // ─── Eye Toggle ───
+  function toggleEye(inputId, btn) {
+    const inp = document.getElementById(inputId);
+    const isText = inp.type === 'text';
+    inp.type = isText ? 'password' : 'text';
+    btn.innerHTML = isText
+      ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+      : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  }
+
+  // ─── Password Strength ───
+  function checkStrength(val) {
+    const segs = [document.getElementById('str-1'), document.getElementById('str-2'),
+                  document.getElementById('str-3'), document.getElementById('str-4')];
+    const txt = document.getElementById('str-text');
+    segs.forEach(s => s.className = 'strength-segment');
+
+    if (!val) { txt.textContent = 'ความปลอดภัยรหัสผ่าน'; txt.style.color = ''; return; }
+
+    let score = 0;
+    if (val.length >= 6)  score++;
+    if (val.length >= 10) score++;
+    if (/[A-Z]/.test(val) || /[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const labels = ['', 'อ่อนแอ', 'พอใช้', 'ดี', 'แข็งแกร่ง'];
+    const classes = ['', 'weak', 'medium', 'strong', 'strong'];
+    const colors  = ['', 'var(--error)', '#f0b90b', 'var(--success)', 'var(--success)'];
+
+    for (let i = 0; i < score; i++) segs[i].classList.add(classes[score]);
+    txt.textContent = labels[score];
+    txt.style.color = colors[score];
+  }
+
+  // ─── Alerts ───
+  function showAlert(id, msg) {
+    const el = document.getElementById(id);
+    if (msg && document.getElementById(id.replace('error','error-msg').replace('admin-error','admin-error-msg'))) {
+      const msgEl = document.getElementById(id + '-msg');
+      if (msgEl) msgEl.textContent = msg;
+    }
+    el.classList.add('show');
+  }
+  function hideAlert(id) { document.getElementById(id)?.classList.remove('show'); }
+  function hideAllAlerts() {
+    ['login-error','reg-error','reg-success','admin-error'].forEach(hideAlert);
+  }
+
+  // ─── Modal ───
+  function showModal(icon, title, desc, isAdmin = false) {
+    document.getElementById('modal-icon').textContent = icon;
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-desc').textContent  = desc;
+    document.getElementById('modal-btn').className = 'modal-btn' + (isAdmin ? ' admin-btn' : '');
+    document.getElementById('modal-overlay').classList.add('show');
+  }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('show');
+  }
+
+  // ─── User Login ───
+  function handleUserLogin(e) {
+    e.preventDefault();
+    hideAllAlerts();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    const found = users.find(u => u.username === username && u.password === password);
+    if (found) {
+      // Check if banned
+      const bannedList = JSON.parse(localStorage.getItem('gm_banned') || '[]');
+      if (bannedList.includes(username)) {
+        document.getElementById('login-error-msg').textContent = '⛔ บัญชีนี้ถูกระงับโดยแอดมิน กรุณาติดต่อผู้ดูแลระบบ';
+        showAlert('login-error');
+        shake('btn-login');
+        return;
+      }
+      localStorage.setItem('gm_session', JSON.stringify({ name: found.name, username: found.username, role: 'user' }));
+      showModal('🎉', `ยินดีต้อนรับ, ${found.name}!`, 'คุณเข้าสู่ระบบสำเร็จแล้ว ระบบกำลังนำทาง...');
+      setTimeout(() => window.location.href = 'dashboard.html', 1400);
+    } else {
+      document.getElementById('login-error-msg').textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+      showAlert('login-error');
+      shake('btn-login');
+    }
+  }
+
+  // ─── User Register ───
+  function handleRegister(e) {
+    e.preventDefault();
+    hideAllAlerts();
+    const name     = document.getElementById('reg-name').value.trim();
+    const username = document.getElementById('reg-username').value.trim().toLowerCase();
+    const password = document.getElementById('reg-password').value;
+    const confirm  = document.getElementById('reg-confirm').value;
+
+    // Block reserved admin username
+    if (username === 'sitthichok' || username === 'admin') {
+      document.getElementById('reg-error-msg').textContent = 'ชื่อผู้ใช้นี้ถูกสงวนไว้ กรุณาเลือกชื่ออื่น';
+      return showAlert('reg-error');
+    }
+    if (password.length < 6) {
+      document.getElementById('reg-error-msg').textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+      return showAlert('reg-error');
+    }
+    if (password !== confirm) {
+      document.getElementById('reg-error-msg').textContent = 'รหัสผ่านไม่ตรงกัน กรุณากรอกใหม่';
+      return showAlert('reg-error');
+    }
+    if (users.find(u => u.username === username)) {
+      document.getElementById('reg-error-msg').textContent = 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว';
+      return showAlert('reg-error');
+    }
+
+    users.push({ name, username, password });
+    localStorage.setItem('gold_users', JSON.stringify(users));
+    showAlert('reg-success');
+    document.querySelector('#form-register form').reset();
+    checkStrength('');
+    setTimeout(() => switchSubTab('login'), 2000);
+  }
+
+  // ─── Admin Login ───
+  function handleAdminLogin(e) {
+    e.preventDefault();
+    hideAllAlerts();
+    const username = document.getElementById('admin-username').value.trim();
+    const password = document.getElementById('admin-password').value;
+
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+      localStorage.setItem('gm_session', JSON.stringify({ name: 'Sitthichok', username: username, role: 'admin' }));
+      showModal('🛡️', 'ยินดีต้อนรับ แอดมิน!', `สวัสดีครับ คุณ ${username} กำลังนำทางไปยังระบบ...`, true);
+      setTimeout(() => window.location.href = 'dashboard.html', 1400);
+    } else {
+      document.getElementById('admin-error-msg').textContent = 'ชื่อผู้ใช้หรือรหัสผ่านแอดมินไม่ถูกต้อง';
+      showAlert('admin-error');
+      shake('panel-admin');
+    }
+  }
+
+  // ─── Shake Animation ───
+  function shake(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.animation = 'shake 0.4s ease';
+    el.addEventListener('animationend', () => el.style.animation = '', { once: true });
+  }
+
+  // Add shake keyframes
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes shake {
+      0%,100%{transform:translateX(0)}
+      20%{transform:translateX(-6px)}
+      40%{transform:translateX(6px)}
+      60%{transform:translateX(-4px)}
+      80%{transform:translateX(4px)}
+    }
+  `;
+  document.head.appendChild(style);
+</script>
+</body>
+</html>
