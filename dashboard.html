@@ -1261,6 +1261,8 @@ function adminSwitchUser(val) {
   loadUserData();
   updateViewingBanner();
   renderOverview();
+  renderAccounts();
+  renderTxList();
   updateBadge();
   updateActiveAccount();
   populateAccountSelect();
@@ -1296,6 +1298,8 @@ function adminExitView() {
   loadUserData();
   document.querySelectorAll('.viewing-banner').forEach(b => b.remove());
   renderOverview();
+  renderAccounts();
+  renderTxList();
   updateBadge();
   updateActiveAccount();
   populateAccountSelect();
