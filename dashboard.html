@@ -1402,7 +1402,7 @@ async function loadUserData() {
 // AUTH CHECK
 // ══════════════════════════════════════════════════
 async function checkAuth() {
-  if (!session) { window.location.href = 'login.html'; return; }
+  if (!session) { window.location.href = 'index.html'; return; }
   document.getElementById('user-display-name').textContent = session.name || session.username;
   document.getElementById('user-display-role').textContent = session.role === 'admin' ? '👑 แอดมิน' : '👤 ผู้ใช้';
   const initials = (session.name || session.username || 'U')[0].toUpperCase();
@@ -1490,7 +1490,7 @@ async function adminExitView() {
 
 function logout() {
   localStorage.removeItem(KEY_USER);
-  window.location.href = 'login.html';
+  window.location.href = 'index.html';
 }
 
 function saveAllLocalStorage() {
