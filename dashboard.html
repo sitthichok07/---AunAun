@@ -2504,8 +2504,8 @@ async function renderAdminPage() {
           ${isViewing?'👁️ กำลังดู':'👁️ ดูข้อมูล'}
         </button>
         ${u.banned
-          ? \`<button class="action-btn unban" onclick="unbanUser('${u.username}')">✅ ยกเลิกบัน</button>\`
-          : \`<button class="action-btn ban" onclick="banUser('${u.username}')">🚫 บัน</button>\`
+          ? `<button class="action-btn unban" onclick="unbanUser('${u.username}')">✅ ยกเลิกบัน</button>`
+          : `<button class="action-btn ban" onclick="banUser('${u.username}')">🚫 บัน</button>`
         }
         <button class="action-btn del" onclick="deleteUser('${u.username}')">🗑️ ลบ</button>
       </div>`;
