@@ -1382,22 +1382,22 @@ let barChart, donutChart;
 // ─── Supabase Initialize ───
 let SUPABASE_URL = localStorage.getItem('gm_supabase_url') || '';
 let SUPABASE_KEY = localStorage.getItem('gm_supabase_key') || '';
-let supabase = null;
+let dbClient = null;
 
 function initSupabase() {
   if (SUPABASE_URL && SUPABASE_KEY) {
     try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       document.getElementById('supabase-banner').style.display = 'none';
       document.getElementById('supabase-config-btn').innerHTML = '🟢 คลาวด์ออนไลน์';
       document.getElementById('supabase-config-btn').style.borderColor = 'var(--income)';
       document.getElementById('supabase-config-btn').style.color = 'var(--income)';
     } catch (err) {
       console.error('Supabase initialization failed:', err);
-      supabase = null;
+      dbClient = null;
     }
   }
-  if (!supabase) {
+  if (!dbClient) {
     document.getElementById('supabase-banner').style.display = 'block';
     document.getElementById('supabase-config-btn').innerHTML = '⚙️ ตั้งค่าคลาวด์';
     document.getElementById('supabase-config-btn').style.borderColor = 'var(--border)';
@@ -1435,11 +1435,11 @@ function activeUser() {
 
 // Load data for the active user
 async function loadUserData() {
-  if (supabase) {
+  if (dbClient) {
     try {
       const uname = activeUser();
       
-      const { data: dbAccs, error: accError } = await supabase
+      const { data: dbAccs, error: accError } = await dbClient
         .from('gm_accounts')
         .select('*')
         .eq('username', uname);
@@ -1453,7 +1453,7 @@ async function loadUserData() {
         initialBalance: Number(a.initial_balance || 0)
       }));
 
-      const { data: dbTxs, error: txError } = await supabase
+      const { data: dbTxs, error: txError } = await dbClient
         .from('gm_transactions')
         .select('*')
         .eq('username', uname);
@@ -1470,7 +1470,7 @@ async function loadUserData() {
       }));
       transactions.sort((a,b) => b.id.localeCompare(a.id));
 
-      const { data: dbFixed, error: fixedError } = await supabase
+      const { data: dbFixed, error: fixedError } = await dbClient
         .from('gm_fixed_expenses')
         .select('*')
         .eq('username', uname);
@@ -1519,9 +1519,9 @@ async function buildAdminUserSwitcher() {
   if (!sel) return;
   
   let registered = [];
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { data } = await supabase.from('gm_users').select('username, name, role');
+      const { data } = await dbClient.from('gm_users').select('username, name, role');
       registered = (data || []).filter(u => u.role !== 'admin');
     } catch (err) {
       console.error(err);
@@ -1672,9 +1672,9 @@ async function saveAccount() {
   
   const newAcc = { id: Date.now().toString(), username: activeUser(), name, type, balance, color: selectedColor, initial_balance: balance };
   
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_accounts').insert([newAcc]);
+      const { error } = await dbClient.from('gm_accounts').insert([newAcc]);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -1696,9 +1696,9 @@ async function saveAccount() {
 
 async function deleteAccount(id) {
   if (!confirm('ลบบัญชีและรายการทั้งหมดในบัญชีนี้?')) return;
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_accounts').delete().eq('id', id);
+      const { error } = await dbClient.from('gm_accounts').delete().eq('id', id);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -1832,9 +1832,9 @@ async function addTransaction() {
 
   const newTx = { id: Date.now().toString(), username: activeUser(), account_id: accId, type: txType, title, amount, category: cat, date, note };
 
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_transactions').insert([newTx]);
+      const { error } = await dbClient.from('gm_transactions').insert([newTx]);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -1903,9 +1903,9 @@ function promptDelete(id) {
   openModal('modal-delete');
 }
 async function confirmDelete() {
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_transactions').delete().eq('id', deleteTargetId);
+      const { error } = await dbClient.from('gm_transactions').delete().eq('id', deleteTargetId);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -2097,9 +2097,9 @@ async function addFixedExpense() {
 
   const newFixed = { id: Date.now().toString(), username: activeUser(), name, amt, emoji };
 
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_fixed_expenses').insert([newFixed]);
+      const { error } = await dbClient.from('gm_fixed_expenses').insert([newFixed]);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -2119,9 +2119,9 @@ async function addFixedExpense() {
 }
 
 async function removeFixed(id) {
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_fixed_expenses').delete().eq('id', id);
+      const { error } = await dbClient.from('gm_fixed_expenses').delete().eq('id', id);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -2290,9 +2290,9 @@ function setAdminFilter(f, el) {
 }
 
 async function banUser(username) {
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_users').update({ banned: true }).eq('username', username);
+      const { error } = await dbClient.from('gm_users').update({ banned: true }).eq('username', username);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -2308,9 +2308,9 @@ async function banUser(username) {
 }
 
 async function unbanUser(username) {
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_users').update({ banned: false }).eq('username', username);
+      const { error } = await dbClient.from('gm_users').update({ banned: false }).eq('username', username);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -2328,9 +2328,9 @@ async function unbanUser(username) {
 async function deleteUser(username) {
   if (!confirm('ลบผู้ใช้ "' + username + '" ออกจากระบบ? ไม่สามารถกู้คืนได้')) return;
 
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('gm_users').delete().eq('username', username);
+      const { error } = await dbClient.from('gm_users').delete().eq('username', username);
       if (error) throw error;
     } catch (err) {
       console.error(err);
@@ -2363,9 +2363,9 @@ async function renderAdminPage() {
   const search = (document.getElementById('admin-search')?.value || '').toLowerCase();
   
   let dbUsers = [];
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { data, error } = await supabase.from('gm_users').select('*');
+      const { data, error } = await dbClient.from('gm_users').select('*');
       if (error) throw error;
       dbUsers = data || [];
     } catch (err) {
@@ -2378,7 +2378,7 @@ async function renderAdminPage() {
   const adminUser = { name: 'Sitthichok', username: 'sitthichok', role: 'admin', banned: false, isAdmin: true };
   
   let users = [];
-  if (supabase && dbUsers.length > 0) {
+  if (dbClient && dbUsers.length > 0) {
     users = dbUsers.map(u => ({
       name: u.name,
       username: u.username,
@@ -2397,10 +2397,10 @@ async function renderAdminPage() {
 
   let allAccs = [];
   let allTxs = [];
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { data: accs } = await supabase.from('gm_accounts').select('*');
-      const { data: txs } = await supabase.from('gm_transactions').select('*');
+      const { data: accs } = await dbClient.from('gm_accounts').select('*');
+      const { data: txs } = await dbClient.from('gm_transactions').select('*');
       allAccs = accs || [];
       allTxs = txs || [];
     } catch (err) {
@@ -2410,7 +2410,7 @@ async function renderAdminPage() {
 
   let totalTx = 0, totalBal = 0;
   
-  if (supabase && dbUsers.length > 0) {
+  if (dbClient && dbUsers.length > 0) {
     totalTx = allTxs.length;
     allAccs.forEach(acc => {
       const inc = allTxs.filter(t => t.type === 'income' && t.account_id === acc.id).reduce((s,t) => s + Number(t.amount || 0), 0);
@@ -2468,7 +2468,7 @@ async function renderAdminPage() {
 
     let userTxCount = '-', userAccCount = '-', userBal = '-';
     if (!u.isAdmin) {
-      if (supabase && dbUsers.length > 0) {
+      if (dbClient && dbUsers.length > 0) {
         const uTxs = allTxs.filter(t => t.username === u.username);
         const uAccs = allAccs.filter(a => a.username === u.username);
         userTxCount = uTxs.length;
