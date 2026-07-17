@@ -1142,9 +1142,9 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">💰 รายรับทั้งหมดในเดือนนี้ (บาท)</label>
+              <label class="form-label">💰 เงินในบัญชีปัจจุบัน / งบประมาณ (บาท)</label>
               <input class="form-input" type="number" id="bgt-income" placeholder="เช่น 25000" min="0" oninput="calcBudget()" />
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">📌 ดึงจากรายการอัตโนมัติ หรือกรอกเองได้</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">⚡ ดึงจากยอดเงินในบัญชีปัจจุบันอัตโนมัติ — แก้ไขได้ตลอด</div>
             </div>
 
             <div class="form-group">
@@ -1161,7 +1161,7 @@
             </div>
 
             <button class="btn-primary" onclick="syncIncomeFromTx()" style="margin-bottom:0;">
-              🔄 ดึงรายรับจากรายการอัตโนมัติ
+              🔄 ดึงยอดเงินปัจจุบันจากทุกบัญชี
             </button>
           </div>
 
@@ -2217,16 +2217,16 @@ function renderFixedList() {
 }
 
 function syncIncomeFromTx() {
-  const now = new Date();
-  const monthlyInc = transactions
-    .filter(t => t.type==='income' && new Date(t.date).getFullYear()===now.getFullYear() && new Date(t.date).getMonth()===now.getMonth())
-    .reduce((s,t) => s+t.amount, 0);
-  if (monthlyInc > 0) {
-    document.getElementById('bgt-income').value = monthlyInc;
-    toast('ดึงรายรับ ' + fmt(monthlyInc) + ' สำเร็จ', 'success');
-  } else {
-    toast('ยังไม่มีรายรับในเดือนนี้ กรุณากรอกเอง', 'error');
-  }
+  // Recalculate account balances to be absolutely fresh
+  accounts.forEach(acc => {
+    const inc = transactions.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s+t.amount, 0);
+    const exp = transactions.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s+t.amount, 0);
+    acc.balance = (acc.initialBalance || 0) + inc - exp;
+  });
+  const netBalance = accounts.reduce((s,a) => s + (a.balance || 0), 0);
+
+  document.getElementById('bgt-income').value = netBalance;
+  toast('ดึงเงินปัจจุบัน ' + fmt(netBalance) + ' สำเร็จ', 'success');
   calcBudget();
 }
 
@@ -2234,7 +2234,7 @@ function syncIncomeFromTx() {
 function saveBudgetSettings() {
   const uname = activeUser();
   if (!uname) return;
-  // Only persist saving goal & mode — income always comes from live transactions
+  // Only persist saving goal & mode — income always comes from live transactions or balances
   const saving   = document.getElementById('bgt-saving').value;
   const startDay = document.getElementById('bgt-start-day').value;
   localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay }));
@@ -2244,14 +2244,14 @@ function loadBudgetSettings() {
   const uname = activeUser();
   if (!uname) return;
 
-  // Always pull income live from this month's transactions
-  const now = new Date();
-  const monthlyInc = transactions
-    .filter(t => t.type==='income'
-      && new Date(t.date).getFullYear()===now.getFullYear()
-      && new Date(t.date).getMonth()===now.getMonth())
-    .reduce((s,t) => s+t.amount, 0);
-  document.getElementById('bgt-income').value = monthlyInc > 0 ? monthlyInc : '';
+  // Recalculate account balances to be absolutely fresh
+  accounts.forEach(acc => {
+    const inc = transactions.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s+t.amount, 0);
+    const exp = transactions.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s+t.amount, 0);
+    acc.balance = (acc.initialBalance || 0) + inc - exp;
+  });
+  const netBalance = accounts.reduce((s,a) => s + (a.balance || 0), 0);
+  document.getElementById('bgt-income').value = netBalance;
 
   // Restore saving goal and startDay from storage
   const stored = localStorage.getItem(`gm_budget_settings_${uname}`);
