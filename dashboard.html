@@ -655,6 +655,34 @@
     }
   
     
+    /* ══ BUDGET MODE TABS ════════════════════════ */
+    .bmode-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      background: var(--bg-primary);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+    }
+    .bmode-tab {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: calc(var(--radius-sm) - 2px);
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+    .bmode-tab.active {
+      background: var(--accent);
+      color: #0b0e11;
+    }
+    .bmode-panel { display: none; }
+    .bmode-panel.active { display: block; }
+
     /* ══ MINI CALENDAR ═══════════════════════════ */
     .calendar-grid-header {
       display: grid;
@@ -1150,38 +1178,57 @@
 
           <!-- LEFT: ตั้งค่างบ -->
           <div class="card">
-            <div class="card-header" style="margin-bottom:16px;">
+            <div class="card-header" style="margin-bottom:12px;">
               <div class="card-title">⚙️ ตั้งค่างบประมาณ</div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">💰 เงินในบัญชีปัจจุบัน / งบประมาณ (บาท)</label>
-              <input class="form-input" type="number" id="bgt-income" placeholder="เช่น 25000" min="0" oninput="calcBudget()" />
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">⚡ ดึงจากยอดเงินในบัญชีปัจจุบันอัตโนมัติ — แก้ไขได้ตลอด</div>
+            <!-- Mode Tabs -->
+            <div class="bmode-tabs">
+              <button class="bmode-tab active" id="tab-auto" onclick="switchBudgetMode('auto')">📊 อัตโนมัติ</button>
+              <button class="bmode-tab"        id="tab-fixed" onclick="switchBudgetMode('fixed')">🎯 กำหนดเอง</button>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">🎯 ตั้งเป้างบใช้จ่ายต่อวัน (บาท)</label>
-              <input class="form-input" type="number" id="bgt-daily-target" placeholder="เช่น 50 หรือ 70" min="1" value="70" oninput="calcBudget()" />
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">📌 งบตั้งต้นรายวันสำหรับการนำมาคำนวณสะสมยอดเกิน/เหลือ</div>
+            <!-- ── TAB A: Auto (divide balance by days left) ── -->
+            <div class="bmode-panel active" id="panel-auto">
+              <div class="form-group">
+                <label class="form-label">💰 เงินในบัญชีปัจจุบัน (บาท)</label>
+                <input class="form-input" type="number" id="bgt-income" placeholder="เช่น 25000" min="0" oninput="calcBudget()" />
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">⚡ ดึงจากยอดบัญชีอัตโนมัติ — แก้ไขได้ตลอด</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">🎯 เป้าหมายเงินออม (บาท/เดือน)</label>
+                <input class="form-input" type="number" id="bgt-saving" placeholder="เช่น 5000" min="0" oninput="calcBudget()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">📅 คำนวณตั้งแต่</label>
+                <select class="form-select" id="bgt-start-day" onchange="calcBudget()">
+                  <option value="today">วันนี้เป็นต้นไป</option>
+                  <option value="month">ต้นเดือน (วันที่ 1)</option>
+                </select>
+              </div>
+              <button class="btn-primary" onclick="syncIncomeFromTx()" style="margin-bottom:0;">
+                🔄 ดึงยอดเงินจากทุกบัญชี
+              </button>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">🎯 เป้าหมายเงินออม (บาท/เดือน)</label>
-              <input class="form-input" type="number" id="bgt-saving" placeholder="เช่น 5000" min="0" oninput="calcBudget()" />
+            <!-- ── TAB B: Fixed Capital + Daily Target ── -->
+            <div class="bmode-panel" id="panel-fixed">
+              <div class="form-group">
+                <label class="form-label">💵 เงินต้น / งบทั้งหมด (บาท)</label>
+                <input class="form-input" type="number" id="bgt-capital" placeholder="เช่น 1000" min="0" oninput="calcBudget()" />
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">📌 ตั้งถาวร แก้ไขได้ตลอด — ไม่เกี่ยวกับยอดบัญชี</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">📆 งบใช้จ่ายต่อวัน (บาท)</label>
+                <input class="form-input" type="number" id="bgt-daily-target" placeholder="เช่น 50" min="1" oninput="calcBudget()" />
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔄 ระบบทบยอดเหลือ/หักยอดเกินอัตโนมัติทุกวัน</div>
+              </div>
+              <div style="background:var(--bg-primary);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-secondary);line-height:1.7;">
+                <div>📗 ใช้ไม่หมด → <strong style="color:#03c087;">วันพรุ่งนี้ได้เพิ่ม</strong></div>
+                <div>📕 ใช้เกิน → <strong style="color:#f6465d;">วันพรุ่งนี้ถูกหัก</strong></div>
+                <div>🔒 เงินออม <strong>ไม่ถูกแตะ</strong> — เก็บตามเป้าได้แน่นอน</div>
+              </div>
             </div>
-
-            <div class="form-group">
-              <label class="form-label">📅 คำนวณตั้งแต่วันที่</label>
-              <select class="form-select" id="bgt-start-day" onchange="calcBudget()">
-                <option value="today">วันนี้เป็นต้นไป</option>
-                <option value="month">ต้นเดือน (วันที่ 1)</option>
-              </select>
-            </div>
-
-            <button class="btn-primary" onclick="syncIncomeFromTx()" style="margin-bottom:0;">
-              🔄 ดึงยอดเงินปัจจุบันจากทุกบัญชี
-            </button>
           </div>
 
           <!-- 📅 Mini Calendar Card -->
@@ -2253,35 +2300,38 @@ function syncIncomeFromTx() {
 function saveBudgetSettings() {
   const uname = activeUser();
   if (!uname) return;
-  // Persist saving goal, start day, and the daily budget target
-  const saving      = document.getElementById('bgt-saving').value;
-  const startDay    = document.getElementById('bgt-start-day').value;
-  const dailyTarget = document.getElementById('bgt-daily-target').value;
-  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay, dailyTarget }));
+  const budgetMode  = document.getElementById('tab-fixed')?.classList.contains('active') ? 'fixed' : 'auto';
+  const saving      = document.getElementById('bgt-saving')?.value || '';
+  const startDay    = document.getElementById('bgt-start-day')?.value || 'today';
+  const dailyTarget = document.getElementById('bgt-daily-target')?.value || '70';
+  const capital     = document.getElementById('bgt-capital')?.value || '';
+  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay, dailyTarget, capital, budgetMode }));
 }
 
 function loadBudgetSettings() {
   const uname = activeUser();
   if (!uname) return;
 
-  // Recalculate account balances to be absolutely fresh
+  // Recalculate account balances — for auto tab
   accounts.forEach(acc => {
     const inc = transactions.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s+t.amount, 0);
     const exp = transactions.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s+t.amount, 0);
     acc.balance = (acc.initialBalance || 0) + inc - exp;
   });
   const netBalance = accounts.reduce((s,a) => s + (a.balance || 0), 0);
-  document.getElementById('bgt-income').value = netBalance;
+  if (document.getElementById('bgt-income')) document.getElementById('bgt-income').value = netBalance;
 
-  // Restore saving goal, startDay, and dailyTarget from storage
+  // Restore all settings from storage
   const stored = localStorage.getItem(`gm_budget_settings_${uname}`);
   if (stored) {
-    const settings = JSON.parse(stored);
-    document.getElementById('bgt-saving').value       = settings.saving       || '';
-    document.getElementById('bgt-start-day').value    = settings.startDay    || 'today';
-    document.getElementById('bgt-daily-target').value = settings.dailyTarget || '70';
+    const s = JSON.parse(stored);
+    if (document.getElementById('bgt-saving'))       document.getElementById('bgt-saving').value       = s.saving       || '';
+    if (document.getElementById('bgt-start-day'))    document.getElementById('bgt-start-day').value    = s.startDay    || 'today';
+    if (document.getElementById('bgt-daily-target')) document.getElementById('bgt-daily-target').value = s.dailyTarget || '70';
+    if (document.getElementById('bgt-capital'))      document.getElementById('bgt-capital').value      = s.capital      || '';
+    switchBudgetMode(s.budgetMode || 'auto', false); // restore tab without saving
   } else {
-    document.getElementById('bgt-daily-target').value = '70';
+    if (document.getElementById('bgt-daily-target')) document.getElementById('bgt-daily-target').value = '70';
   }
 }
 
@@ -2331,12 +2381,29 @@ function renderMiniCalendar() {
   }
 }
 
+function switchBudgetMode(mode, andSave = true) {
+  const panels = ['auto', 'fixed'];
+  panels.forEach(p => {
+    const tab   = document.getElementById('tab-' + p);
+    const panel = document.getElementById('panel-' + p);
+    if (!tab || !panel) return;
+    if (p === mode) { tab.classList.add('active'); panel.classList.add('active'); }
+    else            { tab.classList.remove('active'); panel.classList.remove('active'); }
+  });
+  calcBudget();
+}
+
 function calcBudget() {
-  const now    = new Date();
+  const now = new Date();
+  const budgetMode = document.getElementById('tab-fixed')?.classList.contains('active') ? 'fixed' : 'auto';
+
+  if (budgetMode === 'fixed') { calcBudgetFixed(); return; }
+
+  // ── MODE A: Auto (divide net balance by days left) ──
   const income = parseFloat(document.getElementById('bgt-income')?.value) || 0;
   const saving = parseFloat(document.getElementById('bgt-saving')?.value) || 0;
   const mode   = document.getElementById('bgt-start-day')?.value || 'today';
-  const dailyTarget = parseFloat(document.getElementById('bgt-daily-target')?.value) || 70;
+  const dailyTarget = 0; // not used in mode A
 
   // ── Days calculation ──
   const lastDay    = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
@@ -2468,6 +2535,119 @@ function calcBudget() {
 
   renderFixedList();
   renderBudgetChart(income, saving, fixedTotal, available - fixedTotal - saving);
+  saveBudgetSettings();
+  renderMiniCalendar();
+}
+
+function calcBudgetFixed() {
+  const now     = new Date();
+  const capital = parseFloat(document.getElementById('bgt-capital')?.value) || 0;
+  const target  = parseFloat(document.getElementById('bgt-daily-target')?.value) || 70;
+
+  // Days
+  const lastDay  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const todayDay = now.getDate();
+  const daysLeft = lastDay - todayDay + 1; // incl. today
+  const daysPassed = todayDay - 1;         // days before today this month
+
+  // This month's spending before today (for rollover) and today only
+  const yr  = now.getFullYear();
+  const mo  = String(now.getMonth()+1).padStart(2,'0');
+  const dy  = String(now.getDate()).padStart(2,'0');
+  const todayStr = `${yr}-${mo}-${dy}`;
+
+  const spentThisMonth = transactions
+    .filter(t => t.type==='expense' && new Date(t.date).getFullYear()===yr && new Date(t.date).getMonth()===now.getMonth())
+    .reduce((s,t) => s+t.amount, 0);
+
+  const spentToday = transactions
+    .filter(t => t.type==='expense' && t.date?.slice(0,10)===todayStr)
+    .reduce((s,t) => s+t.amount, 0);
+  const spentBeforeToday = spentThisMonth - spentToday;
+
+  // Rollover: positive = overspent (bad), negative = underspent (surplus)
+  const expectedBefore = target * daysPassed;
+  const rollover       = spentBeforeToday - expectedBefore; // + means overspent
+  const todayBudget    = target - rollover;                 // can go negative
+  const todayRemaining = todayBudget - spentToday;          // can go negative
+
+  // Percent of capital spent
+  const pct = capital > 0 ? Math.min(100, Math.round((spentThisMonth / capital) * 100)) : 0;
+
+  // ── Update hero UI ──
+  const dailyEl  = document.getElementById('daily-result');
+  const descEl   = document.getElementById('daily-desc');
+  const daysEl   = document.getElementById('days-left-txt');
+  const ringEl   = document.getElementById('ring-fill');
+  const ringPct  = document.getElementById('ring-pct');
+  const barEl    = document.getElementById('status-bar');
+  const statusTx = document.getElementById('status-txt');
+  const remLbl   = document.getElementById('remaining-lbl');
+
+  // Show today's budget (can be negative — displayed in red)
+  if (todayBudget < 0) {
+    dailyEl.textContent = '-฿' + fmt(Math.abs(todayBudget));
+    dailyEl.className   = 'daily-amount danger';
+  } else {
+    dailyEl.textContent = fmt(todayBudget);
+    dailyEl.className   = 'daily-amount' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warning' : '');
+  }
+
+  descEl.textContent = `วันนี้ | เป้าหมาย ${fmt(target)} บาท/วัน`;
+  daysEl.textContent = `เหลืออีก ${daysLeft} วัน (วันที่ ${todayDay}–${lastDay} ${['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][now.getMonth()+1]})`;
+
+  document.getElementById('spent-amt').textContent        = fmt(spentThisMonth);
+  document.getElementById('budget-total-lbl').textContent = fmt(capital);
+  remLbl.textContent = `คงเหลือรวม ${fmt(capital - spentThisMonth)}`;
+
+  // Today stats
+  const tsl = document.getElementById('today-spent-lbl');
+  const trl = document.getElementById('today-remain-lbl');
+  if (tsl) tsl.textContent = fmt(spentToday);
+  if (trl) {
+    trl.textContent  = todayRemaining < 0 ? '-฿' + fmt(Math.abs(todayRemaining)) : fmt(todayRemaining);
+    trl.style.color  = todayRemaining <= 0 ? '#f6465d' : '#03c087';
+  }
+
+  // Safety status — capital vs planned total spend
+  const safetyEl = document.getElementById('safety-status-lbl');
+  if (safetyEl) {
+    safetyEl.textContent = '';
+    safetyEl.style.color = '';
+  }
+
+  // Rollover badge
+  const badge = document.getElementById('rollover-badge');
+  if (badge) {
+    if (Math.abs(rollover) >= 1) {
+      badge.style.display = 'inline-flex';
+      if (rollover > 0) {
+        badge.textContent        = `🔴 ใช้เกินสะสม ฿${fmt(rollover)} → วันนี้ถูกหัก`;
+        badge.style.background   = 'rgba(246,70,93,0.15)';
+        badge.style.color        = '#f6465d';
+      } else {
+        badge.textContent        = `🟢 ประหยัดสะสม ฿${fmt(Math.abs(rollover))} → วันนี้ได้เพิ่ม`;
+        badge.style.background   = 'rgba(3,192,135,0.15)';
+        badge.style.color        = '#03c087';
+      }
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Ring
+  const circumference = 314;
+  ringEl.style.strokeDashoffset = circumference - (pct/100)*circumference;
+  ringEl.style.stroke = pct >= 90 ? '#f6465d' : pct >= 70 ? '#f0b90b' : '#03c087';
+  ringPct.textContent = pct + '%';
+  ringPct.style.color = pct >= 90 ? '#f6465d' : pct >= 70 ? '#f0b90b' : '#03c087';
+
+  // Status bar
+  barEl.style.width    = pct + '%';
+  barEl.className      = 'status-bar-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
+  statusTx.textContent = pct >= 90 ? 'เกือบเต็มแล้ว ⚠️' : pct >= 70 ? 'ระวัง! กำลังใช้เงินเยอะ' : 'ปกติ ✅';
+
+  renderFixedList();
   saveBudgetSettings();
   renderMiniCalendar();
 }
