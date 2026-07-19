@@ -1214,25 +1214,23 @@
             <!-- ── TAB B: Fixed Capital + Daily Target ── -->
             <div class="bmode-panel" id="panel-fixed">
               <div class="form-group">
-                <label class="form-label">💵 เงินต้น / งบทั้งหมด (บาท)</label>
+                <label class="form-label">💵 ยอดเงินปัจจุบัน (บาท)</label>
                 <input class="form-input" type="number" id="bgt-capital" placeholder="เช่น 1000" min="0" oninput="calcBudget()" />
-                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">📌 ตั้งถาวร แก้ไขได้ตลอด — ไม่เกี่ยวกับยอดบัญชี</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">⚡ ดึงจากยอดบัญชีอัตโนมัติ — แก้ไขได้ตลอด</div>
               </div>
               <div class="form-group">
                 <label class="form-label">📆 งบใช้จ่ายต่อวัน (บาท)</label>
                 <input class="form-input" type="number" id="bgt-daily-target" placeholder="เช่น 50" min="1" oninput="calcBudget()" />
-                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔄 ระบบทบยอดเหลือ/หักยอดเกินอัตโนมัติทุกวัน</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔄 ใช้เหลือ → วันพรุ่งนี้ได้เพิ่ม | ใช้เกิน → วันพรุ่งนี้ถูกหัก</div>
               </div>
               <div class="form-group">
                 <label class="form-label">🎯 เป้าหมายเงินออม (บาท/เดือน)</label>
                 <input class="form-input" type="number" id="bgt-fixed-saving" placeholder="เช่น 500" min="0" oninput="calcBudget()" />
                 <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔒 เงินออมจะไม่ถูกใช้ — แยกออกจากงบใช้จ่ายสิ้นเชิง</div>
               </div>
-              <div style="background:var(--bg-primary);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-secondary);line-height:1.7;">
-                <div>📗 ใช้ไม่หมด → <strong style="color:#03c087;">วันพรุ่งนี้ได้เพิ่ม</strong></div>
-                <div>📕 ใช้เกิน → <strong style="color:#f6465d;">วันพรุ่งนี้ถูกหัก</strong></div>
-                <div>🔒 เงินออม <strong>ไม่ถูกแตะ</strong> — เก็บตามเป้าได้แน่นอน</div>
-              </div>
+              <button class="btn-primary" onclick="syncCapitalFromTx()" style="margin-bottom:0;">
+                🔄 ดึงยอดเงินปัจจุบันจากทุกบัญชี
+              </button>
             </div>
           </div>
 
@@ -2288,16 +2286,26 @@ function renderFixedList() {
 }
 
 function syncIncomeFromTx() {
-  // Recalculate account balances to be absolutely fresh
   accounts.forEach(acc => {
     const inc = transactions.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s+t.amount, 0);
     const exp = transactions.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s+t.amount, 0);
     acc.balance = (acc.initialBalance || 0) + inc - exp;
   });
   const netBalance = accounts.reduce((s,a) => s + (a.balance || 0), 0);
-
   document.getElementById('bgt-income').value = netBalance;
   toast('ดึงเงินปัจจุบัน ' + fmt(netBalance) + ' สำเร็จ', 'success');
+  calcBudget();
+}
+
+function syncCapitalFromTx() {
+  accounts.forEach(acc => {
+    const inc = transactions.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s+t.amount, 0);
+    const exp = transactions.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s+t.amount, 0);
+    acc.balance = (acc.initialBalance || 0) + inc - exp;
+  });
+  const netBalance = accounts.reduce((s,a) => s + (a.balance || 0), 0);
+  document.getElementById('bgt-capital').value = netBalance;
+  toast('ดึงยอดเงินปัจจุบัน ' + fmt(netBalance) + ' สำเร็จ', 'success');
   calcBudget();
 }
 
@@ -2318,25 +2326,29 @@ function loadBudgetSettings() {
   const uname = activeUser();
   if (!uname) return;
 
-  // Recalculate account balances — for auto tab
+  // Always recalculate live balance for BOTH tabs
   accounts.forEach(acc => {
     const inc = transactions.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s+t.amount, 0);
     const exp = transactions.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s+t.amount, 0);
     acc.balance = (acc.initialBalance || 0) + inc - exp;
   });
   const netBalance = accounts.reduce((s,a) => s + (a.balance || 0), 0);
-  if (document.getElementById('bgt-income')) document.getElementById('bgt-income').value = netBalance;
 
-  // Restore all settings from storage
+  // Auto tab: income = current balance
+  if (document.getElementById('bgt-income')) document.getElementById('bgt-income').value = netBalance;
+  // Fixed tab: capital = current balance (auto-sync on open)
+  if (document.getElementById('bgt-capital')) document.getElementById('bgt-capital').value = netBalance;
+
+  // Restore saved settings (overwrite capital if user stored a custom one)
   const stored = localStorage.getItem(`gm_budget_settings_${uname}`);
   if (stored) {
     const s = JSON.parse(stored);
     if (document.getElementById('bgt-saving'))        document.getElementById('bgt-saving').value        = s.saving       || '';
     if (document.getElementById('bgt-start-day'))      document.getElementById('bgt-start-day').value      = s.startDay    || 'today';
     if (document.getElementById('bgt-daily-target'))   document.getElementById('bgt-daily-target').value   = s.dailyTarget || '70';
-    if (document.getElementById('bgt-capital'))        document.getElementById('bgt-capital').value        = s.capital      || '';
     if (document.getElementById('bgt-fixed-saving'))   document.getElementById('bgt-fixed-saving').value   = s.fixedSaving  || '';
-    switchBudgetMode(s.budgetMode || 'auto', false); // restore tab without saving
+    // Note: capital is always live balance — don't restore stored value
+    switchBudgetMode(s.budgetMode || 'auto', false);
   } else {
     if (document.getElementById('bgt-daily-target')) document.getElementById('bgt-daily-target').value = '70';
   }
@@ -2491,43 +2503,52 @@ function calcBudget() {
 }
 
 function calcBudgetFixed() {
-  const now     = new Date();
-  const capital = parseFloat(document.getElementById('bgt-capital')?.value) || 0;
-  const target  = parseFloat(document.getElementById('bgt-daily-target')?.value) || 70;
+  const now      = new Date();
+  const capital  = parseFloat(document.getElementById('bgt-capital')?.value) || 0;
+  const target   = parseFloat(document.getElementById('bgt-daily-target')?.value) || 70;
   const fixedSaving = parseFloat(document.getElementById('bgt-fixed-saving')?.value) || 0;
 
   // Days
-  const lastDay  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const todayDay = now.getDate();
-  const daysLeft = lastDay - todayDay + 1; // incl. today
-  const daysPassed = todayDay - 1;         // days before today this month
+  const lastDay    = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const todayDay   = now.getDate();
+  const daysLeft   = lastDay - todayDay + 1;
+  const daysPassed = todayDay - 1; // days before today (Jan 1 = 0 passed)
 
-  // This month's spending before today (for rollover) and today only
+  // Dates
   const yr  = now.getFullYear();
   const mo  = String(now.getMonth()+1).padStart(2,'0');
-  const dy  = String(now.getDate()).padStart(2,'0');
+  const dy  = String(todayDay).padStart(2,'0');
   const todayStr = `${yr}-${mo}-${dy}`;
+  const monthNames = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
+  // Spending
   const spentThisMonth = transactions
     .filter(t => t.type==='expense' && new Date(t.date).getFullYear()===yr && new Date(t.date).getMonth()===now.getMonth())
     .reduce((s,t) => s+t.amount, 0);
-
   const spentToday = transactions
     .filter(t => t.type==='expense' && t.date?.slice(0,10)===todayStr)
     .reduce((s,t) => s+t.amount, 0);
   const spentBeforeToday = spentThisMonth - spentToday;
 
-  // Rollover: positive = overspent (bad), negative = underspent (surplus)
+  // ── Rollover logic ────────────────────────────────────────────
+  // expectedBefore = target * days already passed (not incl. today)
+  // rollover + = overspent before (deduct from today)
+  // rollover - = underspent before (add to today)
   const expectedBefore = target * daysPassed;
   const rollover       = spentBeforeToday - expectedBefore; // + means overspent
-  const todayBudget    = target - rollover;                 // can go negative
-  const todayRemaining = todayBudget - spentToday;          // can go negative
 
-  // Capital breakdown: saving is ring-fenced, rest is spending pool
-  const spendingPool = capital - fixedSaving;
+  // todayBudget = target ± accumulated rollover (can go negative)
+  const todayBudget    = target - rollover;
+
+  // Today: how much over/under the target right now (for today only)
+  const todayDiff      = spentToday - target; // positive = over, negative = under
+  const todayRemaining = todayBudget - spentToday; // how much left for today (incl. rollover)
+
+  // Ring %: based on spendingPool (capital minus savings)
+  const spendingPool = Math.max(0, capital - fixedSaving);
   const pct = spendingPool > 0 ? Math.min(100, Math.round((spentThisMonth / spendingPool) * 100)) : 0;
 
-  // ── Update hero UI ──
+  // ── Update hero UI ────────────────────────────────────────────
   const dailyEl  = document.getElementById('daily-result');
   const descEl   = document.getElementById('daily-desc');
   const daysEl   = document.getElementById('days-left-txt');
@@ -2537,7 +2558,8 @@ function calcBudgetFixed() {
   const statusTx = document.getElementById('status-txt');
   const remLbl   = document.getElementById('remaining-lbl');
 
-  // Show today's budget (can be negative — displayed in red)
+  // Main number = target (งบต่อวันที่ตั้งไว้) — always show as baseline
+  // But if rollover adjusts it, show the adjusted number
   if (todayBudget < 0) {
     dailyEl.textContent = '-฿' + fmt(Math.abs(todayBudget));
     dailyEl.className   = 'daily-amount danger';
@@ -2546,14 +2568,26 @@ function calcBudgetFixed() {
     dailyEl.className   = 'daily-amount' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warning' : '');
   }
 
-  descEl.textContent = `วันนี้ | เป้าหมาย ${fmt(target)} บาท/วัน`;
-  daysEl.textContent = `เหลืออีก ${daysLeft} วัน (วันที่ ${todayDay}–${lastDay} ${['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][now.getMonth()+1]})`;
+  descEl.textContent = `วันนี้จ่ายได้ไม่เกิน | ตั้งไว้ ${fmt(target)} บาท/วัน`;
+  daysEl.textContent = `เหลืออีก ${daysLeft} วัน (วันที่ ${todayDay}–${lastDay} ${monthNames[now.getMonth()+1]})`;
 
   document.getElementById('spent-amt').textContent        = fmt(spentThisMonth);
   document.getElementById('budget-total-lbl').textContent = fmt(spendingPool);
-  const capRemain = spendingPool - spentThisMonth;
-  remLbl.textContent = `ใช้ได้อีก ${fmt(Math.max(0, capRemain))} | ออม ฿${fmt(fixedSaving)}ไม่ถูกแตะ`;
-  remLbl.style.color = capRemain < 0 ? '#f6465d' : 'var(--text-secondary)';
+
+  // remLbl = today's spending status vs target
+  if (spentToday === 0) {
+    remLbl.textContent = `วันนี้ยังไม่ได้ใช้เงิน | งบวันนี้ ${fmt(todayBudget)} บาท`;
+    remLbl.style.color = 'var(--text-secondary)';
+  } else if (todayDiff > 0) {
+    remLbl.textContent = `ใช้วันนี้ไป ${fmt(spentToday)} → เกินงบ -${fmt(todayDiff)} บาท`;
+    remLbl.style.color = '#f6465d';
+  } else if (todayDiff < 0) {
+    remLbl.textContent = `ใช้วันนี้ไป ${fmt(spentToday)} → เหลือ +${fmt(Math.abs(todayDiff))} บาท`;
+    remLbl.style.color = '#03c087';
+  } else {
+    remLbl.textContent = `ใช้วันนี้ครบพอดี ${fmt(spentToday)} บาท`;
+    remLbl.style.color = '#f0b90b';
+  }
 
   // Today stats
   const tsl = document.getElementById('today-spent-lbl');
@@ -2561,31 +2595,43 @@ function calcBudgetFixed() {
   if (tsl) tsl.textContent = fmt(spentToday);
   if (trl) {
     trl.textContent  = todayRemaining < 0 ? '-฿' + fmt(Math.abs(todayRemaining)) : fmt(todayRemaining);
-    trl.style.color  = todayRemaining <= 0 ? '#f6465d' : '#03c087';
+    trl.style.color  = todayRemaining < 0 ? '#f6465d' : '#03c087';
   }
 
-  // Safety status — show saving ring-fenced
+  // Safety status
   const safetyEl = document.getElementById('safety-status-lbl');
-  if (safetyEl && fixedSaving > 0) {
-    safetyEl.innerHTML = `🔒 เงินออมถูกแยกไว้ ฿${fmt(fixedSaving)} — ไม่ถูกใช้แน่นอน`;
-    safetyEl.style.color = '#03c087';
-  } else if (safetyEl) {
-    safetyEl.textContent = '';
+  if (safetyEl) {
+    if (fixedSaving > 0) {
+      safetyEl.innerHTML = `🔒 เงินออม ฿${fmt(fixedSaving)} ถูกแยกไว้ — ไม่ถูกใช้แน่นอน`;
+      safetyEl.style.color = '#03c087';
+    } else {
+      safetyEl.textContent = '';
+    }
   }
 
-  // Rollover badge
+  // Rollover badge — show what tomorrow's budget will be
   const badge = document.getElementById('rollover-badge');
   if (badge) {
-    if (Math.abs(rollover) >= 1) {
+    // After today's spending, what's the rollover going into tomorrow?
+    const rolloverAfterToday = spentThisMonth - (target * todayDay); // total spent vs total expected through today
+    const tomorrowBudget     = target - rolloverAfterToday;          // tomorrow's budget
+
+    if (spentToday > 0) { // only show after spending today
       badge.style.display = 'inline-flex';
-      if (rollover > 0) {
-        badge.textContent        = `🔴 ใช้เกินสะสม ฿${fmt(rollover)} → วันนี้ถูกหัก`;
-        badge.style.background   = 'rgba(246,70,93,0.15)';
-        badge.style.color        = '#f6465d';
+      if (todayDiff > 0) {
+        // Overspent today
+        badge.textContent      = `🔴 ใช้เกิน ฿${fmt(todayDiff)} → พรุ่งนี้เหลือแค่ ฿${fmt(Math.max(0,tomorrowBudget))}`;
+        badge.style.background = 'rgba(246,70,93,0.15)';
+        badge.style.color      = '#f6465d';
+      } else if (todayDiff < 0) {
+        // Underspent today
+        badge.textContent      = `🟢 ประหยัดได้ ฿${fmt(Math.abs(todayDiff))} → พรุ่งนี้ได้ ฿${fmt(tomorrowBudget)}`;
+        badge.style.background = 'rgba(3,192,135,0.15)';
+        badge.style.color      = '#03c087';
       } else {
-        badge.textContent        = `🟢 ประหยัดสะสม ฿${fmt(Math.abs(rollover))} → วันนี้ได้เพิ่ม`;
-        badge.style.background   = 'rgba(3,192,135,0.15)';
-        badge.style.color        = '#03c087';
+        badge.textContent      = `🟡 ใช้ครบพอดี → พรุ่งนี้ได้ ฿${fmt(target)}`;
+        badge.style.background = 'rgba(240,185,11,0.15)';
+        badge.style.color      = '#f0b90b';
       }
     } else {
       badge.style.display = 'none';
@@ -2599,7 +2645,6 @@ function calcBudgetFixed() {
   ringPct.textContent = pct + '%';
   ringPct.style.color = pct >= 90 ? '#f6465d' : pct >= 70 ? '#f0b90b' : '#03c087';
 
-  // Status bar
   barEl.style.width    = pct + '%';
   barEl.className      = 'status-bar-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
   statusTx.textContent = pct >= 90 ? 'เกือบเต็มแล้ว ⚠️' : pct >= 70 ? 'ระวัง! กำลังใช้เงินเยอะ' : 'ปกติ ✅';
