@@ -1223,6 +1223,11 @@
                 <input class="form-input" type="number" id="bgt-daily-target" placeholder="เช่น 50" min="1" oninput="calcBudget()" />
                 <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔄 ระบบทบยอดเหลือ/หักยอดเกินอัตโนมัติทุกวัน</div>
               </div>
+              <div class="form-group">
+                <label class="form-label">🎯 เป้าหมายเงินออม (บาท/เดือน)</label>
+                <input class="form-input" type="number" id="bgt-fixed-saving" placeholder="เช่น 500" min="0" oninput="calcBudget()" />
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔒 เงินออมจะไม่ถูกใช้ — แยกออกจากงบใช้จ่ายสิ้นเชิง</div>
+              </div>
               <div style="background:var(--bg-primary);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-secondary);line-height:1.7;">
                 <div>📗 ใช้ไม่หมด → <strong style="color:#03c087;">วันพรุ่งนี้ได้เพิ่ม</strong></div>
                 <div>📕 ใช้เกิน → <strong style="color:#f6465d;">วันพรุ่งนี้ถูกหัก</strong></div>
@@ -2305,7 +2310,8 @@ function saveBudgetSettings() {
   const startDay    = document.getElementById('bgt-start-day')?.value || 'today';
   const dailyTarget = document.getElementById('bgt-daily-target')?.value || '70';
   const capital     = document.getElementById('bgt-capital')?.value || '';
-  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay, dailyTarget, capital, budgetMode }));
+  const fixedSaving = document.getElementById('bgt-fixed-saving')?.value || '';
+  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay, dailyTarget, capital, fixedSaving, budgetMode }));
 }
 
 function loadBudgetSettings() {
@@ -2325,10 +2331,11 @@ function loadBudgetSettings() {
   const stored = localStorage.getItem(`gm_budget_settings_${uname}`);
   if (stored) {
     const s = JSON.parse(stored);
-    if (document.getElementById('bgt-saving'))       document.getElementById('bgt-saving').value       = s.saving       || '';
-    if (document.getElementById('bgt-start-day'))    document.getElementById('bgt-start-day').value    = s.startDay    || 'today';
-    if (document.getElementById('bgt-daily-target')) document.getElementById('bgt-daily-target').value = s.dailyTarget || '70';
-    if (document.getElementById('bgt-capital'))      document.getElementById('bgt-capital').value      = s.capital      || '';
+    if (document.getElementById('bgt-saving'))        document.getElementById('bgt-saving').value        = s.saving       || '';
+    if (document.getElementById('bgt-start-day'))      document.getElementById('bgt-start-day').value      = s.startDay    || 'today';
+    if (document.getElementById('bgt-daily-target'))   document.getElementById('bgt-daily-target').value   = s.dailyTarget || '70';
+    if (document.getElementById('bgt-capital'))        document.getElementById('bgt-capital').value        = s.capital      || '';
+    if (document.getElementById('bgt-fixed-saving'))   document.getElementById('bgt-fixed-saving').value   = s.fixedSaving  || '';
     switchBudgetMode(s.budgetMode || 'auto', false); // restore tab without saving
   } else {
     if (document.getElementById('bgt-daily-target')) document.getElementById('bgt-daily-target').value = '70';
@@ -2399,68 +2406,38 @@ function calcBudget() {
 
   if (budgetMode === 'fixed') { calcBudgetFixed(); return; }
 
-  // ── MODE A: Auto (divide net balance by days left) ──
+  // ══ MODE A: AUTO ══════════════════════════════════════════════
+  // income = ยอดเงินปัจจุบันในบัญชี (ดึงจาก bgt-income)
+  // saving = เงินออมที่ต้องการเก็บ (หักออกก่อน)
+  // ผลลัพธ์ = (income - saving) / วันที่เหลือในเดือน
+  // ═════════════════════════════════════════════════════════════
   const income = parseFloat(document.getElementById('bgt-income')?.value) || 0;
   const saving = parseFloat(document.getElementById('bgt-saving')?.value) || 0;
-  const mode   = document.getElementById('bgt-start-day')?.value || 'today';
-  const dailyTarget = 0; // not used in mode A
 
-  // ── Days calculation ──
-  const lastDay    = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const todayDay   = now.getDate();
-  const startDay   = mode === 'today' ? todayDay : 1;
-  const daysLeft   = lastDay - todayDay + 1;           // remaining incl. today
-  const totalDays  = lastDay - startDay + 1;           // total days in range
-  const daysPassed = Math.max(0, todayDay - startDay); // days before today in range
+  // วันที่เหลือในเดือนนี้ (รวมวันนี้ด้วย)
+  const lastDay  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const todayDay = now.getDate();
+  const daysLeft = lastDay - todayDay + 1;
 
-  // ── Fixed expenses total ──
-  const fixedTotal = fixedExpenses.reduce((s,f) => s+f.amt, 0);
+  // งบที่ใช้จ่ายได้ = ยอดปัจจุบัน - เงินออม (ไม่หักค่าใช้จ่ายที่ผ่านมาแล้ว เพราะ income คือเงินที่มีอยู่จริงตอนนี้)
+  const spendable  = Math.max(0, income - saving);
+  const todayBudget = daysLeft > 0 ? spendable / daysLeft : 0;
 
-  // ── This month actual expense so far ──
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const date = String(now.getDate()).padStart(2, '0');
-  const todayStr = `${year}-${month}-${date}`;
-
+  // รายจ่ายเดือนนี้ (เพื่อแสดงสถิติ)
+  const yr  = now.getFullYear();
+  const todayStr = `${yr}-${String(now.getMonth()+1).padStart(2,'0')}-${String(todayDay).padStart(2,'0')}`;
   const spentThisMonth = transactions
-    .filter(t => t.type==='expense' && new Date(t.date).getFullYear()===now.getFullYear() && new Date(t.date).getMonth()===now.getMonth())
+    .filter(t => t.type==='expense' && new Date(t.date).getFullYear()===yr && new Date(t.date).getMonth()===now.getMonth())
     .reduce((s,t) => s+t.amount, 0);
-
-  // Split: spent today vs spent before today
   const spentToday = transactions
-    .filter(t => t.type==='expense' && t.date && t.date.slice(0,10)===todayStr)
+    .filter(t => t.type==='expense' && t.date?.slice(0,10)===todayStr)
     .reduce((s,t) => s+t.amount, 0);
-  const spentBeforeToday = spentThisMonth - spentToday;
+  const todayRemaining = Math.max(0, todayBudget - spentToday);
 
-  // ── Available budget for daily spending ──
-  const available  = income - saving - fixedTotal;
+  // % ที่ใช้ไปจากงบที่มีได้
+  const pct = spendable > 0 ? Math.min(100, Math.round((spentThisMonth / (spendable + spentThisMonth)) * 100)) : 0;
 
-  // ── Rollover and daily budget logic (Option B: Daily Target Baseline) ──
-  let rollover = 0;
-  let todayBudget = 0;
-  let todayRemaining = 0;
-
-  if (mode === 'month') {
-    const expectedBeforeToday = dailyTarget * daysPassed;
-    rollover = spentBeforeToday - expectedBeforeToday; // positive = overspent, negative = surplus
-    todayBudget = dailyTarget - rollover;
-    todayRemaining = Math.max(0, todayBudget - spentToday);
-  } else {
-    // mode === 'today'
-    rollover = 0;
-    todayBudget = dailyTarget;
-    todayRemaining = Math.max(0, todayBudget - spentToday);
-  }
-
-  // Safety surplus checks
-  const actualRemaining = available - spentThisMonth;
-  const plannedFutureSpend = Math.max(0, todayBudget - spentToday) + (dailyTarget * (daysLeft - 1));
-  const safetySurplus = actualRemaining - plannedFutureSpend;
-
-  // Percent spent
-  const pct = available > 0 ? Math.min(100, Math.round((spentThisMonth / available) * 100)) : 0;
-
-  // Update hero UI
+  // ── อัปเดต UI ──
   const dailyEl  = document.getElementById('daily-result');
   const descEl   = document.getElementById('daily-desc');
   const daysEl   = document.getElementById('days-left-txt');
@@ -2470,71 +2447,45 @@ function calcBudget() {
   const statusTx = document.getElementById('status-txt');
   const remLbl   = document.getElementById('remaining-lbl');
 
-  dailyEl.textContent = fmt(Math.max(0, todayBudget));
-  dailyEl.className   = 'daily-amount' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warning' : '');
-  descEl.textContent  = `วันนี้ | งบเป้าหมายวันละ ${fmt(dailyTarget)}`;
-  
+  dailyEl.textContent = fmt(todayBudget);
+  dailyEl.className   = 'daily-amount';
+  descEl.textContent  = `ต่อวัน | เงินใช้ได้ ${fmt(spendable)} ÷ ${daysLeft} วัน`;
   daysEl.textContent  = `เหลืออีก ${daysLeft} วัน (วันที่ ${todayDay}–${lastDay} ${['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][now.getMonth()+1]})`;
 
-  document.getElementById('spent-amt').textContent    = fmt(spentThisMonth);
-  document.getElementById('budget-total-lbl').textContent = fmt(available);
-  remLbl.textContent  = `คงเหลือรวม ${fmt(Math.max(0, actualRemaining))}`;
+  document.getElementById('spent-amt').textContent        = fmt(spentThisMonth);
+  document.getElementById('budget-total-lbl').textContent = fmt(spendable);
+  remLbl.textContent  = `เงินใช้ได้ ${fmt(spendable)} | ออม ${fmt(saving)} แยกไว้`;
+  remLbl.style.color  = 'var(--text-secondary)';
 
-  // Today stats
-  const spentTodayEl = document.getElementById('today-spent-lbl');
-  const remainTodayEl = document.getElementById('today-remain-lbl');
-  if (spentTodayEl) spentTodayEl.textContent = fmt(spentToday);
-  if (remainTodayEl) {
-    remainTodayEl.textContent = fmt(todayRemaining);
-    remainTodayEl.style.color = todayRemaining <= 0 ? '#f6465d' : '#03c087';
-  }
+  const tsl = document.getElementById('today-spent-lbl');
+  const trl = document.getElementById('today-remain-lbl');
+  if (tsl) tsl.textContent = fmt(spentToday);
+  if (trl) { trl.textContent = fmt(todayRemaining); trl.style.color = todayRemaining <= 0 ? '#f6465d' : '#03c087'; }
 
-  // Safety status text
   const safetyEl = document.getElementById('safety-status-lbl');
   if (safetyEl) {
-    if (safetySurplus >= 0) {
-      safetyEl.innerHTML = `🟢 เงินในบัญชีเพียงพอจนสิ้นเดือน (เหลือเก็บสำรอง ฿${fmt(safetySurplus)})`;
+    if (saving > 0) {
+      safetyEl.innerHTML = `🔒 เงินออม ฿${fmt(saving)} ถูกแยกออก ไม่นำมาคิดงบรายวัน`;
       safetyEl.style.color = '#03c087';
     } else {
-      safetyEl.innerHTML = `⚠️ เงินในบัญชีอาจไม่พอตามเป้าสิ้นเดือนนี้ (ยังขาดอีก ฿${fmt(Math.abs(safetySurplus))})`;
-      safetyEl.style.color = '#f6465d';
+      safetyEl.textContent = '';
     }
   }
 
-  // Rollover Badge
   const rolloverBadge = document.getElementById('rollover-badge');
-  if (rolloverBadge) {
-    if (mode === 'month' && Math.abs(rollover) >= 1) {
-      rolloverBadge.style.display = 'inline-flex';
-      if (rollover > 0) {
-        rolloverBadge.textContent = `🔴 ใช้เกินสะสมมา ฿${fmt(rollover)} (หักจากวันนี้)`;
-        rolloverBadge.style.background = 'rgba(246,70,93,0.15)';
-        rolloverBadge.style.color = '#f6465d';
-      } else {
-        rolloverBadge.textContent = `🟢 ประหยัดสะสมมา ฿${fmt(Math.abs(rollover))} (เพิ่มให้วันนี้)`;
-        rolloverBadge.style.background = 'rgba(3,192,135,0.15)';
-        rolloverBadge.style.color = '#03c087';
-      }
-    } else {
-      rolloverBadge.style.display = 'none';
-    }
-  }
+  if (rolloverBadge) rolloverBadge.style.display = 'none';
 
-  // Ring
   const circumference = 314;
-  const offset = circumference - (pct / 100) * circumference;
-  ringEl.style.strokeDashoffset = offset;
+  ringEl.style.strokeDashoffset = circumference - (pct/100)*circumference;
   ringEl.style.stroke = pct >= 90 ? '#f6465d' : pct >= 70 ? '#f0b90b' : '#03c087';
   ringPct.textContent = pct + '%';
   ringPct.style.color = pct >= 90 ? '#f6465d' : pct >= 70 ? '#f0b90b' : '#03c087';
 
-  // Status bar
   barEl.style.width    = pct + '%';
   barEl.className      = 'status-bar-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
-  statusTx.textContent = pct >= 90 ? 'เกือบเต็มแล้ว ⚠️' : pct >= 70 ? 'ระวัง! กำลังใช้เงินเยอะ' : 'ปกติ ✅';
+  statusTx.textContent = pct >= 90 ? 'ระวัง! ใช้เยอะมาก ⚠️' : pct >= 70 ? 'ระวัง! กำลังใช้เงินเยอะ' : 'ปกติ ✅';
 
   renderFixedList();
-  renderBudgetChart(income, saving, fixedTotal, available - fixedTotal - saving);
   saveBudgetSettings();
   renderMiniCalendar();
 }
@@ -2543,6 +2494,7 @@ function calcBudgetFixed() {
   const now     = new Date();
   const capital = parseFloat(document.getElementById('bgt-capital')?.value) || 0;
   const target  = parseFloat(document.getElementById('bgt-daily-target')?.value) || 70;
+  const fixedSaving = parseFloat(document.getElementById('bgt-fixed-saving')?.value) || 0;
 
   // Days
   const lastDay  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
@@ -2571,8 +2523,9 @@ function calcBudgetFixed() {
   const todayBudget    = target - rollover;                 // can go negative
   const todayRemaining = todayBudget - spentToday;          // can go negative
 
-  // Percent of capital spent
-  const pct = capital > 0 ? Math.min(100, Math.round((spentThisMonth / capital) * 100)) : 0;
+  // Capital breakdown: saving is ring-fenced, rest is spending pool
+  const spendingPool = capital - fixedSaving;
+  const pct = spendingPool > 0 ? Math.min(100, Math.round((spentThisMonth / spendingPool) * 100)) : 0;
 
   // ── Update hero UI ──
   const dailyEl  = document.getElementById('daily-result');
@@ -2597,8 +2550,10 @@ function calcBudgetFixed() {
   daysEl.textContent = `เหลืออีก ${daysLeft} วัน (วันที่ ${todayDay}–${lastDay} ${['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][now.getMonth()+1]})`;
 
   document.getElementById('spent-amt').textContent        = fmt(spentThisMonth);
-  document.getElementById('budget-total-lbl').textContent = fmt(capital);
-  remLbl.textContent = `คงเหลือรวม ${fmt(capital - spentThisMonth)}`;
+  document.getElementById('budget-total-lbl').textContent = fmt(spendingPool);
+  const capRemain = spendingPool - spentThisMonth;
+  remLbl.textContent = `ใช้ได้อีก ${fmt(Math.max(0, capRemain))} | ออม ฿${fmt(fixedSaving)}ไม่ถูกแตะ`;
+  remLbl.style.color = capRemain < 0 ? '#f6465d' : 'var(--text-secondary)';
 
   // Today stats
   const tsl = document.getElementById('today-spent-lbl');
@@ -2609,11 +2564,13 @@ function calcBudgetFixed() {
     trl.style.color  = todayRemaining <= 0 ? '#f6465d' : '#03c087';
   }
 
-  // Safety status — capital vs planned total spend
+  // Safety status — show saving ring-fenced
   const safetyEl = document.getElementById('safety-status-lbl');
-  if (safetyEl) {
+  if (safetyEl && fixedSaving > 0) {
+    safetyEl.innerHTML = `🔒 เงินออมถูกแยกไว้ ฿${fmt(fixedSaving)} — ไม่ถูกใช้แน่นอน`;
+    safetyEl.style.color = '#03c087';
+  } else if (safetyEl) {
     safetyEl.textContent = '';
-    safetyEl.style.color = '';
   }
 
   // Rollover badge
@@ -2647,7 +2604,6 @@ function calcBudgetFixed() {
   barEl.className      = 'status-bar-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
   statusTx.textContent = pct >= 90 ? 'เกือบเต็มแล้ว ⚠️' : pct >= 70 ? 'ระวัง! กำลังใช้เงินเยอะ' : 'ปกติ ✅';
 
-  renderFixedList();
   saveBudgetSettings();
   renderMiniCalendar();
 }
