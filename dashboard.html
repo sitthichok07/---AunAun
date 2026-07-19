@@ -1228,6 +1228,14 @@
                 <input class="form-input" type="number" id="bgt-fixed-saving" placeholder="เช่น 500" min="0" oninput="calcBudget()" />
                 <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🔒 เงินออมจะไม่ถูกใช้ — แยกออกจากงบใช้จ่ายสิ้นเชิง</div>
               </div>
+              <div class="form-group">
+                <label class="form-label">📅 คำนวณตั้งแต่วันที่</label>
+                <select class="form-select" id="bgt-fixed-start-day" onchange="calcBudget()">
+                  <option value="today">วันนี้เป็นต้นไป</option>
+                  <option value="month">ต้นเดือน (วันที่ 1)</option>
+                </select>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 แนะนำ 'วันนี้เป็นต้นไป' เพื่อเริ่มทบยอดสะสมจากวันนี้</div>
+              </div>
               <button class="btn-primary" onclick="syncCapitalFromTx()" style="margin-bottom:0;">
                 🔄 ดึงยอดเงินปัจจุบันจากทุกบัญชี
               </button>
@@ -2313,13 +2321,14 @@ function syncCapitalFromTx() {
 function saveBudgetSettings() {
   const uname = activeUser();
   if (!uname) return;
-  const budgetMode  = document.getElementById('tab-fixed')?.classList.contains('active') ? 'fixed' : 'auto';
-  const saving      = document.getElementById('bgt-saving')?.value || '';
-  const startDay    = document.getElementById('bgt-start-day')?.value || 'today';
-  const dailyTarget = document.getElementById('bgt-daily-target')?.value || '70';
-  const capital     = document.getElementById('bgt-capital')?.value || '';
-  const fixedSaving = document.getElementById('bgt-fixed-saving')?.value || '';
-  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay, dailyTarget, capital, fixedSaving, budgetMode }));
+  const budgetMode     = document.getElementById('tab-fixed')?.classList.contains('active') ? 'fixed' : 'auto';
+  const saving         = document.getElementById('bgt-saving')?.value || '';
+  const startDay       = document.getElementById('bgt-start-day')?.value || 'today';
+  const dailyTarget    = document.getElementById('bgt-daily-target')?.value || '70';
+  const capital        = document.getElementById('bgt-capital')?.value || '';
+  const fixedSaving    = document.getElementById('bgt-fixed-saving')?.value || '';
+  const fixedStartDay  = document.getElementById('bgt-fixed-start-day')?.value || 'today';
+  localStorage.setItem(`gm_budget_settings_${uname}`, JSON.stringify({ saving, startDay, dailyTarget, capital, fixedSaving, fixedStartDay, budgetMode }));
 }
 
 function loadBudgetSettings() {
@@ -2343,10 +2352,11 @@ function loadBudgetSettings() {
   const stored = localStorage.getItem(`gm_budget_settings_${uname}`);
   if (stored) {
     const s = JSON.parse(stored);
-    if (document.getElementById('bgt-saving'))        document.getElementById('bgt-saving').value        = s.saving       || '';
-    if (document.getElementById('bgt-start-day'))      document.getElementById('bgt-start-day').value      = s.startDay    || 'today';
-    if (document.getElementById('bgt-daily-target'))   document.getElementById('bgt-daily-target').value   = s.dailyTarget || '70';
-    if (document.getElementById('bgt-fixed-saving'))   document.getElementById('bgt-fixed-saving').value   = s.fixedSaving  || '';
+    if (document.getElementById('bgt-saving'))           document.getElementById('bgt-saving').value           = s.saving           || '';
+    if (document.getElementById('bgt-start-day'))         document.getElementById('bgt-start-day').value         = s.startDay         || 'today';
+    if (document.getElementById('bgt-daily-target'))      document.getElementById('bgt-daily-target').value      = s.dailyTarget      || '70';
+    if (document.getElementById('bgt-fixed-saving'))      document.getElementById('bgt-fixed-saving').value      = s.fixedSaving      || '';
+    if (document.getElementById('bgt-fixed-start-day'))   document.getElementById('bgt-fixed-start-day').value   = s.fixedStartDay    || 'today';
     // Note: capital is always live balance — don't restore stored value
     switchBudgetMode(s.budgetMode || 'auto', false);
   } else {
@@ -2507,12 +2517,15 @@ function calcBudgetFixed() {
   const capital  = parseFloat(document.getElementById('bgt-capital')?.value) || 0;
   const target   = parseFloat(document.getElementById('bgt-daily-target')?.value) || 70;
   const fixedSaving = parseFloat(document.getElementById('bgt-fixed-saving')?.value) || 0;
+  const fixedStartDay = document.getElementById('bgt-fixed-start-day')?.value || 'today';
 
   // Days
   const lastDay    = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const todayDay   = now.getDate();
   const daysLeft   = lastDay - todayDay + 1;
-  const daysPassed = todayDay - 1; // days before today (Jan 1 = 0 passed)
+  
+  // If starting from today, daysPassed is 0. If starting from month, daysPassed is todayDay - 1.
+  const daysPassed = fixedStartDay === 'today' ? 0 : todayDay - 1; 
 
   // Dates
   const yr  = now.getFullYear();
@@ -2528,7 +2541,9 @@ function calcBudgetFixed() {
   const spentToday = transactions
     .filter(t => t.type==='expense' && t.date?.slice(0,10)===todayStr)
     .reduce((s,t) => s+t.amount, 0);
-  const spentBeforeToday = spentThisMonth - spentToday;
+  
+  // If starting from today, spentBeforeToday is 0 (ignore previous month expenses for rollover)
+  const spentBeforeToday = fixedStartDay === 'today' ? 0 : (spentThisMonth - spentToday);
 
   // ── Rollover logic ────────────────────────────────────────────
   // expectedBefore = target * days already passed (not incl. today)
